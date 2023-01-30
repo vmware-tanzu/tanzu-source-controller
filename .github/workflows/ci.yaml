@@ -124,7 +124,7 @@ jobs:
         mkdir -p "${scratch}/.imgpkg"
         mkdir -p "${scratch}/config"
 
-        cp LICENSE.txt "${scratch}/LICENSE.txt"
+        cp LICENSE "${scratch}/LICENSE"
         cp dist/bundle.yaml "${scratch}/bundle.yaml"
         cp dist/package-overlay.yaml "${scratch}/package-overlay.yaml"
         cp dist/ca.pem "${scratch}/ca.pem"
