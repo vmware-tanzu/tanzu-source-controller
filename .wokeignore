@@ -1,4 +1,4 @@
 config/rbac/kustomization.yaml
 config/manager/kustomization.yaml
 **/go.sum
-
+CONTRIBUTING.md
