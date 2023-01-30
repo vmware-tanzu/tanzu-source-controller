@@ -5,63 +5,59 @@ read our [Developer Certificate of Origin](https://cla.vmware.com/dco). All cont
 signed as described on that page. Your signature certifies that you wrote the patch or have the right to pass it on
 as an open-source patch.
 
+`Signed-off-by: Jane Doe <jane.doe@example.com>`
+
+The signature must contain your real name
+(sorry, no pseudonyms or anonymous contributions)
+If your `user.name` and `user.email` are configured in your Git config,
+you can sign your commit automatically with `git commit -s`.
+
+## Ways to contribute
+
+We welcome many different types of contributions and not all of them need a Pull request. Contributions may include:
+
+* New features and proposals
+* Documentation
+* Bug fixes
+* Issue Triage
+* Answering questions and giving feedback
+* Helping to onboard new contributors
+* Other related activities
+
+## Getting started
+
+### Development Environment Setup
+
+Follow the documentation in the [development document](./docs/development.md) to get started with developing Tanzu Source Controller.
+
 ## Contribution Flow
 
 This is a rough outline of what a contributor's workflow looks like:
 
-- Create a topic branch from where you want to base your work
+- Make a fork of the repository within your GitHub account
+- Create a topic branch in your fork from where you want to base your work
 - Make commits of logical units
-- Make sure your commit messages are in the proper format (see below)
-- Push your changes to a topic branch in your fork of the repository
-- Submit a pull request
+- Make sure your commit messages are with the proper format, quality and descriptiveness (see below)
+- Push your changes to the topic branch in your fork
+- Create a pull request containing that commit
 
-Example:
+## Acceptance policy
 
-``` shell
-git remote add upstream https://github.com/vmware-tanzu/tanzu-source-controller.git
-git checkout -b my-new-feature main
-git commit -a
-git push origin my-new-feature
-```
+These things will make a PR more likely to be accepted:
 
-### Staying In Sync With Upstream
+- a well-described requirement
+- tests for new code
+- tests for old code!
+- new code and tests follow the conventions in old code and tests
+- a good commit message (see below)
+- all code must abide [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
+- names should abide [What's in a name](https://talks.golang.org/2014/names.slide#1)
+- code should have appropriate test coverage and tests should be written
+  to work with `go test`
 
-When your branch gets out of sync with the vmware-tanzu/main branch, use the following to update:
-
-``` shell
-git checkout my-new-feature
-git fetch -a
-git pull --rebase upstream main
-git push --force-with-lease origin my-new-feature
-```
-
-### Updating pull requests
-
-If your PR fails to pass CI or needs changes based on code review, you'll most likely want to squash these changes into
-existing commits.
-
-If your pull request contains a single commit or your changes are related to the most recent commit, you can simply
-amend the commit.
-
-``` shell
-git add .
-git commit --amend
-git push --force-with-lease origin my-new-feature
-```
-
-If you need to squash changes into an earlier commit, you can use:
-
-``` shell
-git add .
-git commit --fixup <commit>
-git rebase -i --autosquash main
-git push --force-with-lease origin my-new-feature
-```
-
-Be sure to add a comment to the PR indicating your new changes are ready to review, as GitHub does not generate a
-notification when you git push.
-
-### Code Style
+In general, we will merge a PR once one maintainer has endorsed it.
+For substantial changes, more people may become involved, and you might
+get asked to resubmit the PR or divide the changes into more than one PR.
 
 ### Formatting Commit Messages
 

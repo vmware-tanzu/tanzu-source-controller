@@ -1,0 +1,6 @@
+apiVersion: source.apps.tanzu.vmware.com/v1alpha1
+kind: ImageRepository
+metadata:
+  name: imagerepository-sample
+spec:
+  image: ubuntu:bionic

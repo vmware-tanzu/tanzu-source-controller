@@ -1,0 +1,26 @@
+domain: apps.tanzu.vmware.com
+layout:
+- go.kubebuilder.io/v3
+multigroup: true
+projectName: source-controller
+repo: github.com/vmware-tanzu/tanzu-source-controller
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: apps.tanzu.vmware.com
+  group: source
+  kind: ImageRepository
+  path: github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: apps.tanzu.vmware.com
+  group: source
+  kind: MavenArtifact
+  path: github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1
+  version: v1alpha1
+version: "3"

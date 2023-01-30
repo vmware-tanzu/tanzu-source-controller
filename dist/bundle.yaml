@@ -1,0 +1,41 @@
+#! Copyright 2021-2022 VMware Inc. All rights reserved
+
+#@ load("@ytt:base64", "base64")
+#@ load("@ytt:data", "data")
+#@ load("@ytt:overlay", "overlay")
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: reg-creds
+  namespace: source-system
+  annotations:
+    secretgen.carvel.dev/image-pull-secret: ""
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: e30K
+
+#@overlay/match by=overlay.subset({"apiVersion": "apps/v1", "kind": "Deployment"})
+---
+spec:
+  template:
+    spec:
+      #@overlay/match when=0
+      imagePullSecrets:
+      - name: reg-creds
+
+#@overlay/match by=overlay.subset({"apiVersion": "v1", "kind": "Secret", "metadata":{"name": "source-ca-certificates"}})
+---
+data:
+  ca-certificates.crt: #@ base64.encode(data.values.ca_cert_data) if hasattr(data.values, "ca_cert_data") else ""
+
+#@ if hasattr(data.values, "aws_iam_role_arn"):
+#@overlay/match by=overlay.subset({"apiVersion": "v1", "kind": "ServiceAccount", "metadata":{"name": "source-controller-manager"}}) 
+---
+metadata:
+  #@overlay/match missing_ok=True
+  annotations:
+    #@overlay/match missing_ok=True
+    eks.amazonaws.com/role-arn: #@ data.values.aws_iam_role_arn
+#@ end

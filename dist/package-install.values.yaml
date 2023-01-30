@@ -1,0 +1,17 @@
+#! Copyright 2021 VMware Inc. All rights reserved
+
+#@ load("@ytt:data", "data")
+
+#@data/values
+---
+namespace: default
+name: source-controller
+package_name: controller.source.apps.tanzu.vmware.com
+package_prerelease: null
+service_account_name: source-controller-kc
+cluster_role_name: source-controller-kc
+cluster_role_binding_name: source-controller-kc
+sync_period: 10m
+
+has_values: false
+ca_cert_data: ""

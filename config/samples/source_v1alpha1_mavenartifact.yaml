@@ -1,0 +1,41 @@
+apiVersion: source.apps.tanzu.vmware.com/v1alpha1
+kind: MavenArtifact
+metadata:
+  name: mavenartifact-sample
+spec:
+  artifact:
+    groupId: HTTPClient
+    version: 0.3-3
+    artifactId: HTTPClient
+  repository:
+    url: https://repo1.maven.org/maven2
+  interval: 5m0s
+  timeout: 1m0s
+---
+apiVersion: source.apps.tanzu.vmware.com/v1alpha1
+kind: MavenArtifact
+metadata:
+  name: mavenartifact-sample-2
+spec:
+  artifact:
+    groupId: org.elasticsearch.client
+    version: 5.0.0-beta1
+    artifactId: transport
+  repository:
+    url: https://repo1.maven.org/maven2
+  interval: 5m0s
+  timeout: 1m0s
+---
+apiVersion: source.apps.tanzu.vmware.com/v1alpha1
+kind: MavenArtifact
+metadata:
+  name: mavenartifact-sample-3
+spec:
+  artifact:
+    groupId: help.swgoh.api
+    version: RELEASE
+    artifactId: swgoh-api-connector
+  repository:
+    url: https://repo1.maven.org/maven2
+  interval: 5m0s
+  timeout: 1m0s
