@@ -1,0 +1,87 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - source.apps.tanzu.vmware.com
+  resources:
+  - imagerepositories
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - source.apps.tanzu.vmware.com
+  resources:
+  - imagerepositories/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - source.apps.tanzu.vmware.com
+  resources:
+  - imagerepositories/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - source.apps.tanzu.vmware.com
+  resources:
+  - mavenartifacts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - source.apps.tanzu.vmware.com
+  resources:
+  - mavenartifacts/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - source.apps.tanzu.vmware.com
+  resources:
+  - mavenartifacts/status
+  verbs:
+  - get
+  - patch
+  - update

@@ -1,0 +1,20 @@
+# permissions for end users to view imagerepositories.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: imagerepository-viewer-role
+rules:
+- apiGroups:
+  - source.apps.tanzu.vmware.com
+  resources:
+  - imagerepositories
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - source.apps.tanzu.vmware.com
+  resources:
+  - imagerepositories/status
+  verbs:
+  - get

@@ -1,0 +1,7 @@
+#! Copyright 2021 VMware Inc. All rights reserved
+
+#@ load("@ytt:data", "data")
+
+#@data/values
+---
+name: controller.source.apps.tanzu.vmware.com

@@ -1,0 +1,82 @@
+---
+apiVersion: kontinue.io/v1alpha1
+kind: ClusterSupplyChain
+metadata:
+  name: image-repository
+spec:
+  selector:
+    source.apps.tanzu.vmware.com/image: "true"
+  components:
+    - name: source-provider
+      templateRef:
+        kind: ClusterSourceTemplate
+        name: image-repository
+    - name: build-provider
+      sources:
+      - component: source-provider
+        name: provider
+      templateRef:
+        kind: ClusterBuildTemplate
+        name: faux-build
+---
+apiVersion: kontinue.io/v1alpha1
+kind: ClusterSourceTemplate
+metadata:
+  name: image-repository
+spec:
+  urlPath: .status.artifact.url
+  revisionPath: .status.artifact.revision
+  template:
+    apiVersion: source.apps.tanzu.vmware.com/v1alpha1
+    kind: ImageRepository
+    metadata:
+      name: $(workload.name)$-source
+      labels:
+        # app.kubernetes.io/part-of: $(workload.metadata.labels['app.kubernetes.io/part-of'])$
+        app.kubernetes.io/part-of: $(workload.name)$
+    spec:
+      image: $(workload.source.image)$
+---
+apiVersion: kontinue.io/v1alpha1
+kind: ClusterBuildTemplate
+metadata:
+  name: faux-build
+spec:
+  imagePath: .status.not.a.real.build
+  template:
+    apiVersion: batch/v1beta1
+    kind: CronJob
+    metadata:
+      name: $(workload.name)$-build
+      labels:
+        # app.kubernetes.io/part-of: $(workload.metadata.labels['app.kubernetes.io/part-of'])$
+        app.kubernetes.io/part-of: $(workload.name)$
+        app.kubernetes.io/component: build
+    spec:
+      schedule: "*/1 * * * *"
+      jobTemplate:
+        metadata:
+          labels:
+            kontinue.io/workload-name: $(workload.name)$
+            kontinue.io/workload-namespace: $(workload.namespace)$
+            # app.kubernetes.io/part-of: $(workload.metadata.labels['app.kubernetes.io/part-of'])$
+            app.kubernetes.io/part-of: $(workload.name)$
+            app.kubernetes.io/component: build
+        spec:
+          template:
+            metadata:
+              labels:
+                kontinue.io/workload-name: $(workload.name)$
+                kontinue.io/workload-namespace: $(workload.namespace)$
+                # app.kubernetes.io/part-of: $(workload.metadata.labels['app.kubernetes.io/part-of'])$
+                app.kubernetes.io/part-of: $(workload.name)$
+                app.kubernetes.io/component: build
+            spec:
+              containers:
+              - name: build
+                image: projectriff/dev-utils
+                command:
+                - /bin/sh
+                - -c
+                - curl $(sources[0].url)$ | tar tzv
+              restartPolicy: Never

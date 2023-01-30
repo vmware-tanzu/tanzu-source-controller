@@ -1,0 +1,14 @@
+
+#! Copyright 2022 VMware Inc. All rights reserved
+
+#@ load("@ytt:base64", "base64")
+#@ load("@ytt:data", "data")
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kapp-controller-config
+  namespace: kapp-controller
+data:
+  caCerts: #@ base64.encode(data.values.ca_cert_data)

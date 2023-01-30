@@ -1,0 +1,24 @@
+# permissions for end users to edit mavenartifacts.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mavenartifact-editor-role
+rules:
+- apiGroups:
+  - source.apps.tanzu.vmware.com
+  resources:
+  - mavenartifacts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - source.apps.tanzu.vmware.com
+  resources:
+  - mavenartifacts/status
+  verbs:
+  - get

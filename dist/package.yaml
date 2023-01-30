@@ -1,0 +1,40 @@
+#! Copyright 2021 VMware Inc. All rights reserved
+
+#@ load("@ytt:data", "data")
+
+---
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: Package
+metadata:
+  name: #@ data.values.name + '.' + data.values.version
+spec:
+  refName: #@ data.values.name
+  version: #@ data.values.version
+  valuesSchema:
+    openAPIv3:
+      title: #@ data.values.name + '.' + data.values.version + ' values schema'
+      properties:
+        ca_cert_data:
+          type: string
+          description: "Optional: PEM Encoded certificate data for image registries with private CA."
+          default: ""
+        aws_iam_role_arn:
+          type: string
+          description: "Optional: The AWS IAM Role ARN to attach to the source controller service account"
+          nullable: true
+  template:
+    spec:
+      fetch:
+      - imgpkgBundle:
+          image: #@ data.values.image
+      template:
+      - kbld:
+          paths:
+          - .imgpkg/images.yml
+          - config/source-controller.yaml
+      - ytt:
+          paths:
+          - "-"
+          - bundle.yaml
+      deploy:
+      - kapp: {}

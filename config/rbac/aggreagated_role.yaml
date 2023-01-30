@@ -1,0 +1,12 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: app-viewer
+  labels:
+    # Add these permissions to the "app-viewer" role.
+    apps.tanzu.vmware.com/aggregate-to-app-viewer: "true"
+rules:
+- apiGroups: ["source.apps.tanzu.vmware.com"]
+  resources: ["imagerepositories", "mavenartifacts"]
+  verbs: ["get","list","watch"]
