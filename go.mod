@@ -10,7 +10,7 @@ require (
 	github.com/google/go-containerregistry v0.13.0
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20220105220605-d9bfbcb99e52
 	github.com/vmware-labs/reconciler-runtime v0.11.0
-	github.com/vmware-tanzu/carvel-imgpkg v0.25.0
+	github.com/vmware-tanzu/carvel-imgpkg v0.35.0
 	go.uber.org/zap v1.24.0
 	k8s.io/api v0.26.1
 	k8s.io/apimachinery v0.26.1
@@ -19,10 +19,14 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute v1.14.0 // indirect
+	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	github.com/Azure/azure-sdk-for-go v55.0.0+incompatible // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.27 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.20 // indirect
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.2 // indirect
+	github.com/Azure/go-autorest/autorest/azure/cli v0.4.1 // indirect
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect
 	github.com/Azure/go-autorest/autorest/validation v0.1.0 // indirect
@@ -30,12 +34,26 @@ require (
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/VividCortex/ewma v1.1.1 // indirect
 	github.com/aws/aws-sdk-go v1.39.4 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.7.1 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.5.0 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.3.1 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.3.0 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.1.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ecr v1.4.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ecrpublic v1.4.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.2.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.3.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.6.0 // indirect
+	github.com/aws/smithy-go v1.6.0 // indirect
+	github.com/awslabs/amazon-ecr-credential-helper/ecr-login v0.0.0-20220517224237-e6f29200ae04 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cheggaaa/pb/v3 v3.0.8 // indirect
+	github.com/chrismellard/docker-credential-acr-env v0.0.0-20220327082430-c57b701bfc08 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.12.1 // indirect
 	github.com/cppforlife/color v1.9.1-0.20200716202919-6706ac40b835 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dimchansky/utfbom v1.1.0 // indirect
 	github.com/docker/cli v20.10.20+incompatible // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/docker v20.10.20+incompatible // indirect
@@ -63,7 +81,7 @@ require (
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
-	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-runewidth v0.0.12 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -86,10 +104,10 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10 // indirect
+	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/oauth2 v0.1.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.3.0 // indirect
+	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/term v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
