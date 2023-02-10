@@ -152,7 +152,7 @@ jobs:
           grype dir:. --exclude ./hack
         echo "##[endgroup]"
         echo "##[group]Scan manager image"
-          grype registry.local/source/source-controller:latest
+          grype registry.local/source/tanzu-source-controller
         echo "##[endgroup]"
       continue-on-error: true
 
