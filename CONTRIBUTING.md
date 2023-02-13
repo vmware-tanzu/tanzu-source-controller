@@ -1,16 +1,12 @@
 # Contributing to tanzu-source-controller
 
-The tanzu-source-controller project team welcomes contributions from the community. Before you start working with tanzu-source-controller, please
-read our [Developer Certificate of Origin](https://cla.vmware.com/dco). All contributions to this repository must be
-signed as described on that page. Your signature certifies that you wrote the patch or have the right to pass it on
-as an open-source patch.
+The tanzu-source-controller project team welcomes contributions from the community. If you wish to contribute code and you have not signed our contributor license agreement (CLA), our bot will update the issue when you open a Pull Request. 
+
+For any questions about the CLA process, please refer to our [FAQ](https://cla.vmware.com/faq). Your signature certifies that you wrote the patch or have the right to pass it on as an open-source patch.
 
 `Signed-off-by: Jane Doe <jane.doe@example.com>`
 
-The signature must contain your real name
-(sorry, no pseudonyms or anonymous contributions)
-If your `user.name` and `user.email` are configured in your Git config,
-you can sign your commit automatically with `git commit -s`.
+The signature must contain your real name (sorry, no pseudonyms or anonymous contributions) If your `user.name` and `user.email` are configured in your Git config, you can sign your commit automatically with `git commit -s`.
 
 ## Ways to contribute
 
