@@ -165,7 +165,7 @@ For Source Controller development setup, please see the development guide [here]
 
 ## Contributing
 
-The tanzu-source-controller project team welcomes contributions from the community. Before you start working with tanzu-source-controller, please read and sign our Contributor License Agreement CLA. If you wish to contribute code and you have not signed our contributor license agreement (CLA), our bot will prompt you to do so when you open a Pull Request. For any questions about the CLA process, please refer to our [FAQ](https://cla.vmware.com/faq).
+The tanzu-source-controller project team welcomes contributions from the community. Before you start working with tanzu-source-controller, please read and sign our Contributor License Agreement(https://cla.vmware.com/cla/1/preview). If you wish to contribute code and you have not signed our contributor license agreement (CLA), our bot will prompt you to do so when you open a Pull Request. For any questions about the CLA process, please refer to our [FAQ](https://cla.vmware.com/faq).
 
 ## License
 
