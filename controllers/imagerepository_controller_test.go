@@ -59,7 +59,7 @@ func TestImageRepositoryReconciler(t *testing.T) {
 
 	helloImage := fmt.Sprintf("%s/%s", registryHost, "hello")
 	helloDigest := "66201d7a2285b74eef3221c5f548ebcaba03f9891eef305be94f4d51c661d933"
-	helloChecksum := "d0ab7a6a9af1c8d60aa7d0fc1392853c9b7ccade"
+	helloChecksum := "00a04fda65d6d2c7924a2729b8369efbe3f4e978"
 	utilruntime.Must(btesting.LoadImage(registry, "fixtures/hello.tar", helloImage))
 
 	artifactRootDir, err := ioutil.TempDir(os.TempDir(), "artifacts.*")
@@ -668,7 +668,7 @@ func TestImageRepositoryPullImageSyncReconciler(t *testing.T) {
 	helloImage := fmt.Sprintf("%s/%s", registryHost, "hello")
 	utilruntime.Must(btesting.LoadImage(registry, "fixtures/hello.tar", helloImage))
 	helloDigest := "66201d7a2285b74eef3221c5f548ebcaba03f9891eef305be94f4d51c661d933"
-	helloChecksum := "d0ab7a6a9af1c8d60aa7d0fc1392853c9b7ccade"
+	helloChecksum := "00a04fda65d6d2c7924a2729b8369efbe3f4e978"
 	image := fmt.Sprintf("%s@sha256:%s", helloImage, helloDigest)
 
 	artifactRootDir, err := ioutil.TempDir(os.TempDir(), "artifacts.*")
@@ -892,7 +892,7 @@ func TestImageRepositoryPullImageSyncReconcilerWithAuth(t *testing.T) {
 	helloImage := fmt.Sprintf("%s/%s", registryHost, "hello")
 	utilruntime.Must(btesting.LoadImageWithAuth(registry, "fixtures/hello.tar", helloImage, reg_user, reg_pwd))
 	helloDigest := "66201d7a2285b74eef3221c5f548ebcaba03f9891eef305be94f4d51c661d933"
-	helloChecksum := "d0ab7a6a9af1c8d60aa7d0fc1392853c9b7ccade"
+	helloChecksum := "00a04fda65d6d2c7924a2729b8369efbe3f4e978"
 	image := fmt.Sprintf("%s@sha256:%s", helloImage, helloDigest)
 
 	var pullsecrets = []corev1.Secret{}
