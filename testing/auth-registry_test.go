@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/authn/k8schain"
+	"github.com/google/go-containerregistry/pkg/authn/kubernetes"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +30,7 @@ func TestNewAuthRegistryServer(t *testing.T) {
 		},
 	}
 	pullsecrets = append(pullsecrets, secret)
-	keychain, err := k8schain.NewFromPullSecrets(context.TODO(), pullsecrets)
+	keychain, err := kubernetes.NewFromPullSecrets(context.TODO(), pullsecrets)
 
 	type args struct {
 		username string

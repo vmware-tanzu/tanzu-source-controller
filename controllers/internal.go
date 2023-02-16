@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/vmware-tanzu/carvel-imgpkg/pkg/imgpkg/plainimage"
+
 	sourcev1alpha1 "github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1"
 )
 
@@ -180,3 +182,18 @@ func (r *MavenResolver) processReleaseVersion(ctx context.Context, client *http.
 	r.DownloadURL = fmt.Sprintf("%s/%s/%s/%s", r.RepositoryURL, r.RequestPath, r.ResolvedVersion, r.ResolvedFilename)
 	return nil
 }
+
+// imgpkg logger
+
+var _ plainimage.Logger = &NoopLogger{}
+
+// NewNoopLogger creates a new noop logger
+func NewNoopLogger() *NoopLogger {
+	return &NoopLogger{}
+}
+
+// NoopLogger this logger will not print
+type NoopLogger struct{}
+
+// Logf does nothing
+func (n NoopLogger) Logf(string, ...interface{}) {}
