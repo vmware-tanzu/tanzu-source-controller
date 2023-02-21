@@ -9,7 +9,7 @@ KAPP_ARGS ?= "--yes=false"
 CONTROLLER_GEN ?= go run -modfile hack/go.mod sigs.k8s.io/controller-tools/cmd/controller-gen
 DIEGEN ?= go run -modfile hack/go.mod dies.dev/diegen
 GOIMPORTS ?= go run -modfile hack/go.mod golang.org/x/tools/cmd/goimports
-KAPP ?= go run -modfile hack/kapp/go.mod github.com/k14s/kapp/cmd/kapp
+KAPP ?= go run -modfile hack/kapp/github.com/vmware-tanzu/carvel-kapp/cmd/kapp
 KO ?= go run -modfile hack/ko/go.mod github.com/google/ko
 KUSTOMIZE ?= go run -modfile hack/kustomize/go.mod sigs.k8s.io/kustomize/kustomize/v4
 YTT ?= go run -modfile hack/ytt/go.mod github.com/k14s/ytt/cmd/ytt
