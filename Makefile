@@ -9,11 +9,11 @@ KAPP_ARGS ?= "--yes=false"
 CONTROLLER_GEN ?= go run -modfile hack/go.mod sigs.k8s.io/controller-tools/cmd/controller-gen
 DIEGEN ?= go run -modfile hack/go.mod dies.dev/diegen
 GOIMPORTS ?= go run -modfile hack/go.mod golang.org/x/tools/cmd/goimports
-KAPP ?= go run -modfile hack/kapp/github.com/vmware-tanzu/carvel-kapp/cmd/kapp
-KO ?= go run -modfile hack/ko/go.mod github.com/google/ko
-KUSTOMIZE ?= go run -modfile hack/kustomize/go.mod sigs.k8s.io/kustomize/kustomize/v4
-YTT ?= go run -modfile hack/ytt/go.mod github.com/k14s/ytt/cmd/ytt
-WOKE ?= go run -modfile hack/woke/go.mod github.com/get-woke/woke
+KAPP ?= go run -modfile hack/go.mod github.com/vmware-tanzu/carvel-kapp/cmd/kapp
+KO ?= go run -modfile hack/go.mod github.com/google/ko
+KUSTOMIZE ?= go run -modfile hack/go.mod sigs.k8s.io/kustomize/kustomize/v4
+YTT ?= go run -modfile hack/go.mod github.com/vmware-tanzu/carvel-ytt/cmd/ytt
+WOKE ?= go run -modfile hack/go.mod github.com/get-woke/woke
 CA_DATA ?= dist/ca.pem
 
 
@@ -99,8 +99,3 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 tidy: ## Run go mod tidy
 	go mod tidy -v
 	cd hack; go mod tidy -v
-	cd hack/kapp; go mod tidy -v
-	cd hack/ko; go mod tidy -v
-	cd hack/kustomize; go mod tidy -v
-	cd hack/ytt; go mod tidy -v
-	cd hack/woke; go mod tidy -v

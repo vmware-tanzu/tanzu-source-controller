@@ -10,7 +10,7 @@ on:
   pull_request: {}
 
 env:
-  KO: go run -modfile hack/ko/go.mod github.com/google/ko
+  KO: go run -modfile hack/go.mod github.com/google/ko
 
 jobs:
 

@@ -4,27 +4,14 @@ updates:
   directory: "/"
   schedule:
     interval: daily
+  open-pull-requests-limit: 10
 - package-ecosystem: gomod
   directory: "/"
   schedule:
     interval: daily
+  open-pull-requests-limit: 10
 - package-ecosystem: gomod
   directory: "/hack"
   schedule:
     interval: daily
-- package-ecosystem: gomod
-  directory: "/hack/kapp"
-  schedule:
-    interval: daily
-- package-ecosystem: gomod
-  directory: "/hack/ko"
-  schedule:
-    interval: daily
-- package-ecosystem: gomod
-  directory: "/hack/kustomize"
-  schedule:
-    interval: daily
-- package-ecosystem: gomod
-  directory: "/hack/ytt"
-  schedule:
-    interval: daily
+  open-pull-requests-limit: 10
