@@ -2210,8 +2210,8 @@ github.com/vmware-tanzu/carvel-kapp-controller v0.42.0 h1:Y+FISnGQMUU6L52uoAor0y
 github.com/vmware-tanzu/carvel-kapp-controller v0.42.0/go.mod h1:TNGaklDZt7V4hYjU/YAlNPvsqDtDC+TGFRQuyGw8ykw=
 github.com/vmware-tanzu/carvel-vendir v0.30.0 h1:JqElRFpSsYJQmI5Hrxl1Fx9wJZ2xeDk+TVnnSrFLFVU=
 github.com/vmware-tanzu/carvel-vendir v0.30.0/go.mod h1:qFV2/3Cu584fhG2wXodoIm8KhX1wKHRFavBiRjK/Ly0=
-github.com/vmware-tanzu/carvel-ytt v0.44.3 h1:bKC2elsZZmYdZVVqj1VGzM4kcEjVaFJJQ+81YnwNumE=
-github.com/vmware-tanzu/carvel-ytt v0.44.3/go.mod h1:JaAZ6SUbVsRe3W+jylnenBf1LNJRJi+k+7v3tGrhnco=
+github.com/vmware-tanzu/carvel-ytt v0.44.4 h1:zQ1QwofuX83j5xiCAl/nLWfVq9STayVpzByeN0gtvr4=
+github.com/vmware-tanzu/carvel-ytt v0.44.4/go.mod h1:JaAZ6SUbVsRe3W+jylnenBf1LNJRJi+k+7v3tGrhnco=
 github.com/weppos/publicsuffix-go v0.15.1-0.20210807195340-dc689ff0bb59/go.mod h1:HYux0V0Zi04bHNwOHy4cXJVz/TQjYonnF6aoYhj+3QE=
 github.com/weppos/publicsuffix-go v0.15.1-0.20220329081811-9a40b608a236/go.mod h1:HYux0V0Zi04bHNwOHy4cXJVz/TQjYonnF6aoYhj+3QE=
 github.com/weppos/publicsuffix-go v0.15.1-0.20220413065649-906f534b73a4/go.mod h1:HYux0V0Zi04bHNwOHy4cXJVz/TQjYonnF6aoYhj+3QE=
