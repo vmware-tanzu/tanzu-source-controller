@@ -6,7 +6,7 @@ require (
 	dies.dev/diegen v0.7.0
 	github.com/get-woke/woke v0.19.0
 	github.com/google/ko v0.12.0
-	github.com/vmware-tanzu/carvel-kapp v0.54.3
+	github.com/vmware-tanzu/carvel-kapp v0.55.0
 	github.com/vmware-tanzu/carvel-ytt v0.44.3
 	golang.org/x/tools v0.6.0
 	sigs.k8s.io/controller-tools v0.11.3
@@ -47,7 +47,7 @@ require (
 	github.com/caitlinelfring/go-env-default v1.1.0 // indirect
 	github.com/chrismellard/docker-credential-acr-env v0.0.0-20220327082430-c57b701bfc08 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.12.0 // indirect
-	github.com/cppforlife/cobrautil v0.0.0-20220907150944-da5ee3a6ab1f // indirect
+	github.com/cppforlife/cobrautil v0.0.0-20221130162803-acdfead391ef // indirect
 	github.com/cppforlife/color v1.9.1-0.20200716202919-6706ac40b835 // indirect
 	github.com/cppforlife/go-cli-ui v0.0.0-20200716203538-1e47f820817f // indirect
 	github.com/cppforlife/go-patch v0.2.0 // indirect
@@ -141,8 +141,8 @@ require (
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/vbatts/tar-split v0.11.2 // indirect
 	github.com/vito/go-interact v0.0.0-20171111012221-fa338ed9e9ec // indirect
-	github.com/vmware-tanzu/carvel-kapp-controller v0.42.0 // indirect
-	github.com/vmware-tanzu/carvel-vendir v0.30.0 // indirect
+	github.com/vmware-tanzu/carvel-kapp-controller v0.44.6 // indirect
+	github.com/vmware-tanzu/carvel-vendir v0.30.1 // indirect
 	github.com/xlab/treeprint v1.1.0 // indirect
 	go.mongodb.org/mongo-driver v1.10.0 // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
