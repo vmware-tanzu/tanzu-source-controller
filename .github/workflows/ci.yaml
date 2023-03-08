@@ -505,7 +505,7 @@ jobs:
         set -o nounset
         set -o pipefail
 
-        deploys=$(kapp app-change list -a source-controller-ctrl --json | jq '.Tables[0].Rows | length')
+        deploys=$(kapp app-change list -a source-controller.app --json | jq '.Tables[0].Rows | length')
         if [ "$((deploys))" -gt 1 ]; then
           echo "Too many app changes for the source-controller package, expected 1 found ${deploys}"
           exit 1
