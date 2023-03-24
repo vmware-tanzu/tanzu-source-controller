@@ -9,7 +9,7 @@ require (
 	github.com/google/go-containerregistry v0.14.0
 	github.com/google/go-containerregistry/pkg/authn/kubernetes v0.0.0-20230316013512-53189d3374b8
 	github.com/vmware-labs/reconciler-runtime v0.11.1
-	github.com/vmware-tanzu/carvel-imgpkg v0.36.0
+	github.com/vmware-tanzu/carvel-imgpkg v0.36.1
 	go.uber.org/zap v1.24.0
 	k8s.io/api v0.26.3
 	k8s.io/apimachinery v0.26.3
