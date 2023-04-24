@@ -9,7 +9,7 @@ require (
 	github.com/vmware-tanzu/carvel-kapp v0.55.0
 	github.com/vmware-tanzu/carvel-ytt v0.45.0
 	golang.org/x/tools v0.8.0
-	sigs.k8s.io/controller-tools v0.11.3
+	sigs.k8s.io/controller-tools v0.11.4
 	sigs.k8s.io/kustomize/kustomize/v4 v4.5.7
 )
 
