@@ -9,9 +9,6 @@ on:
     - '**'
   pull_request: {}
 
-env:
-  KO: go run -modfile hack/go.mod github.com/google/ko
-
 jobs:
 
   unit:
@@ -114,6 +111,7 @@ jobs:
 
         # Make the $REGISTRY_NAME -> local-registry
         echo "$(hostname -I | cut -d' ' -f1) $REGISTRY_NAME" | sudo tee -a /etc/hosts
+    - uses: ko-build/setup-ko@v0.6
     - name: Build Source Controller
       run: |
         set -o errexit
@@ -130,7 +128,7 @@ jobs:
         cp dist/ca.pem "${scratch}/ca.pem"
 
         echo "##[group]Build"
-          ${KO} resolve --platform=linux/amd64 -B -f dist/source-controller.yaml > "${scratch}/config/source-controller.yaml"
+          ko resolve --platform=linux/amd64 -B -f dist/source-controller.yaml > "${scratch}/config/source-controller.yaml"
           kbld -f "${scratch}/config/source-controller.yaml" --imgpkg-lock-output "${scratch}/.imgpkg/images.yml" > /dev/null
         echo "##[endgroup]"
 
@@ -474,7 +472,7 @@ jobs:
           kapp list -A
         echo "##[endgroup]"
         echo "##[group]Package changesets"
-          kapp app-change list -a source-controller-ctrl
+          kapp app-change list -a source-controller.app
         echo "##[endgroup]"
         echo "##[group]kapp-controller logs"
           kubectl logs -n kapp-controller -l app=kapp-controller -c kapp-controller --tail 1000
