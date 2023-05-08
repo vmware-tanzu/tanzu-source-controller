@@ -721,8 +721,8 @@ github.com/vmware-tanzu/carvel-kapp-controller v0.44.6 h1:OsoZbKK+Ya7R4YKdnHVFB/
 github.com/vmware-tanzu/carvel-kapp-controller v0.44.6/go.mod h1:+drZFlRx8ppIl2LRNWb0X/ohWwrfdA9nXGmPKGzvTXs=
 github.com/vmware-tanzu/carvel-vendir v0.30.1 h1:MHcrz6xZVBu0hOW7DJ5ea7894LG5JsUlb8JbTN/65RI=
 github.com/vmware-tanzu/carvel-vendir v0.30.1/go.mod h1:bwyrhBVq7nCDQwO1tuAEKOc7OCjEZrj9hXCYlibo+u8=
-github.com/vmware-tanzu/carvel-ytt v0.45.0 h1:XB98y4ZZgLAKkLZglE6cMEH5JKUrsa7unxtkHVWMS9E=
-github.com/vmware-tanzu/carvel-ytt v0.45.0/go.mod h1:JaAZ6SUbVsRe3W+jylnenBf1LNJRJi+k+7v3tGrhnco=
+github.com/vmware-tanzu/carvel-ytt v0.45.1 h1:zjiOnV7WiKJbkLHkJCRxlmABOMIL4WhKKyahfCzFoIk=
+github.com/vmware-tanzu/carvel-ytt v0.45.1/go.mod h1:+r+ZVZLsETAYlRsgINztFdUdUufj2OwrTXCfOzYB4fY=
 github.com/xanzy/ssh-agent v0.3.0/go.mod h1:3s9xbODqPuuhK9JV1R321M/FlMZSBvE5aY6eAcqrDh0=
 github.com/xdg-go/pbkdf2 v1.0.0/go.mod h1:jrpuAogTd400dnrH08LKmI/xc1MbPOebTwRqcT5RDeI=
 github.com/xdg-go/scram v1.0.2/go.mod h1:1WAq6h33pAW+iRreB34OORO2Nf7qel3VV3fjBj+hCSs=
