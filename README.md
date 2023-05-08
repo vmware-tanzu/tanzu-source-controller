@@ -17,7 +17,7 @@ The controller follows the spirit of the FluxCD Source Controller. An [`ImageRep
 
 ## Pre-requisites
 
-We require [Golang 1.19+](https://golang.org) to build the controller and deploy it. Internally, the `make` target will create a local version of [`ko`](https://github.com/google/ko) to build the controller, and [`kapp`](https://get-kapp.io) to deploy the controller to a cluster.
+We require [Golang 1.20+](https://golang.org) to build the controller and deploy it. Internally, the `make` target will create a local version of [`ko`](https://github.com/google/ko) to build the controller, and [`kapp`](https://get-kapp.io) to deploy the controller to a cluster.
 
 All 3 CLIs can be easily installed via brew:
 

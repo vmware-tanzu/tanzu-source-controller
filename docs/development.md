@@ -2,7 +2,7 @@
 
 ## Install required dependencies
 
-- Install [Golang 1.19+](https://golang.org)
+- Install [Golang 1.20+](https://golang.org)
 - Install [Cert Manager](https://cert-manager.io)
 - Install [Carvel Tools](https://carvel.dev)
 
