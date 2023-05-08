@@ -72,6 +72,7 @@ type ImageRepositoryStatus struct {
 //+kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 //+kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`
 //+kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+//+kubebuilder:deprecatedversion:warning="imagerepositories.source.apps.tanzu.vmware.com/v1alpha1 ImageRepository is deprecated; use ocirepositories.source.toolkit.fluxcd.io/v1beta2 OCIRepository instead"
 
 // ImageRepository is the Schema for the imagerepositories API
 type ImageRepository struct {

@@ -36,6 +36,8 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    deprecated: true
+    deprecationWarning: imagerepositories.source.apps.tanzu.vmware.com/v1alpha1 ImageRepository is deprecated; use ocirepositories.source.toolkit.fluxcd.io/v1beta2 OCIRepository instead
     name: v1alpha1
     schema:
       openAPIV3Schema:
