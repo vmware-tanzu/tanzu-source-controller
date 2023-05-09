@@ -6,7 +6,7 @@ require (
 	dies.dev/diegen v0.8.0
 	github.com/get-woke/woke v0.19.0
 	github.com/google/ko v0.13.0
-	github.com/vmware-tanzu/carvel-kapp v0.55.0
+	github.com/vmware-tanzu/carvel-kapp v0.55.1
 	github.com/vmware-tanzu/carvel-ytt v0.45.1
 	golang.org/x/tools v0.8.0
 	sigs.k8s.io/controller-tools v0.12.0
