@@ -321,8 +321,8 @@ func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func(
 				return err
 			}
 
-			// Compare checksum with cache
-			if cache != nil {
+			// Compare checksum with cache if the resource status.artifact is set
+			if cache != nil && parent.Status.Artifact != nil {
 				if cache.checksum == remoteChecksum && cache.source == artifactInfo.ArtifactDownloadURL {
 					log.Info("download skipped", "checksum matched on disc", cache.checksum, "checksum from remote repository", remoteChecksum)
 					return nil
