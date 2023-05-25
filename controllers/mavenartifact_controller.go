@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -39,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	sourcev1alpha1 "github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1"
 	"github.com/vmware-tanzu/tanzu-source-controller/pkg/mavenmetadata"
@@ -85,12 +83,11 @@ func (ac *artifactCache) toString() string {
 //+kubebuilder:rbac:groups=source.apps.tanzu.vmware.com,resources=mavenartifacts/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 
-func MavenArtifactReconciler(c reconcilers.Config, httpRootDir, httpHost string, now func() metav1.Time, certs []Cert) *reconcilers.ParentReconciler {
-	return &reconcilers.ParentReconciler{
-		Type: &sourcev1alpha1.MavenArtifact{},
-		Reconciler: &reconcilers.WithFinalizer{
+func MavenArtifactReconciler(c reconcilers.Config, httpRootDir, httpHost string, now func() metav1.Time, certs []Cert) *reconcilers.ResourceReconciler[*sourcev1alpha1.MavenArtifact] {
+	return &reconcilers.ResourceReconciler[*sourcev1alpha1.MavenArtifact]{
+		Reconciler: &reconcilers.WithFinalizer[*sourcev1alpha1.MavenArtifact]{
 			Finalizer: sourcev1alpha1.Group + "/finalizer",
-			Reconciler: reconcilers.Sequence{
+			Reconciler: reconcilers.Sequence[*sourcev1alpha1.MavenArtifact]{
 				MavenArtifactSecretsSyncReconciler(certs),
 				MavenArtifactVersionSyncReconciler(),
 				MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost, now),
@@ -104,8 +101,8 @@ func MavenArtifactReconciler(c reconcilers.Config, httpRootDir, httpHost string,
 
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
 
-func MavenArtifactSecretsSyncReconciler(certs []Cert) reconcilers.SubReconciler {
-	return &reconcilers.SyncReconciler{
+func MavenArtifactSecretsSyncReconciler(certs []Cert) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
+	return &reconcilers.SyncReconciler[*sourcev1alpha1.MavenArtifact]{
 		Name: "MavenArtifactSecretsSyncReconciler",
 		Sync: func(ctx context.Context, parent *sourcev1alpha1.MavenArtifact) error {
 			c := reconcilers.RetrieveConfigOrDie(ctx)
@@ -140,7 +137,7 @@ func MavenArtifactSecretsSyncReconciler(certs []Cert) reconcilers.SubReconciler 
 		},
 		Setup: func(ctx context.Context, mgr controllerruntime.Manager, bldr *builder.Builder) error {
 			// register an informer to watch Secret's metadata only. This reduces the cache size in memory.
-			bldr.Watches(&source.Kind{Type: &corev1.Secret{}}, reconcilers.EnqueueTracked(ctx, &corev1.Secret{}), builder.OnlyMetadata)
+			bldr.Watches(&corev1.Secret{}, reconcilers.EnqueueTracked(ctx), builder.OnlyMetadata)
 			return nil
 		},
 	}
@@ -149,8 +146,8 @@ func MavenArtifactSecretsSyncReconciler(certs []Cert) reconcilers.SubReconciler 
 // MavenArtifactVersionSyncReconciler will download the Maven Metadata XML
 // file from the artifact store and resolve the appropriate version, as per the
 // configuration in the parent MavenArtifact object
-func MavenArtifactVersionSyncReconciler() reconcilers.SubReconciler {
-	return &reconcilers.SyncReconciler{
+func MavenArtifactVersionSyncReconciler() reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
+	return &reconcilers.SyncReconciler[*sourcev1alpha1.MavenArtifact]{
 		Name: "MavenArtifactVersionSyncReconciler",
 		Sync: func(ctx context.Context, parent *sourcev1alpha1.MavenArtifact) error {
 			log := logr.FromContextOrDiscard(ctx)
@@ -244,8 +241,8 @@ func MavenArtifactVersionSyncReconciler() reconcilers.SubReconciler {
 	}
 }
 
-func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func() metav1.Time) reconcilers.SubReconciler {
-	return &reconcilers.SyncReconciler{
+func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func() metav1.Time) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
+	return &reconcilers.SyncReconciler[*sourcev1alpha1.MavenArtifact]{
 		Name: "MavenArtifactDownloadSyncReconciler",
 		Finalize: func(ctx context.Context, parent *sourcev1alpha1.MavenArtifact) error {
 			log := logr.FromContextOrDiscard(ctx)
@@ -336,7 +333,7 @@ func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func(
 				httpRootDir = path.Join(httpRootDir)
 			}
 
-			dir, err := ioutil.TempDir(os.TempDir(), "maven-artifact.*")
+			dir, err := os.MkdirTemp(os.TempDir(), "maven-artifact.*")
 			if err != nil {
 				return err
 			}
@@ -453,10 +450,10 @@ func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func(
 	}
 }
 
-func MavenArtifactIntervalReconciler() reconcilers.SubReconciler {
-	return &reconcilers.SyncReconciler{
+func MavenArtifactIntervalReconciler() reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
+	return &reconcilers.SyncReconciler[*sourcev1alpha1.MavenArtifact]{
 		Name: "MavenArtifactIntervalReconciler",
-		Sync: func(ctx context.Context, parent *sourcev1alpha1.MavenArtifact) (controllerruntime.Result, error) {
+		SyncWithResult: func(ctx context.Context, parent *sourcev1alpha1.MavenArtifact) (controllerruntime.Result, error) {
 			return controllerruntime.Result{RequeueAfter: parent.Spec.Interval.Duration}, nil
 		},
 	}
@@ -582,7 +579,7 @@ func download(ctx context.Context, url string, client *http.Client) ([]byte, err
 	}
 
 	// read response body
-	responseBody, err := ioutil.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, &downloadError{err: fmt.Errorf("Error downloading file data from URL %q: %q", url, err), httpStatuscode: response.StatusCode}
 	}

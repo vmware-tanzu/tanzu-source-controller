@@ -23,7 +23,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -82,79 +81,79 @@ func TestMavenArtifactSecretsSyncReconciler(t *testing.T) {
 			})
 		})
 
-	rts := rtesting.SubReconcilerTestSuite{{
-		Name:     "auth-secret-ref not provided",
-		Resource: parent,
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-				})
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: nil,
+	rts := rtesting.SubReconcilerTests[*sourcev1alpha1.MavenArtifact]{
+		"auth-secret-ref not provided": {
+			Resource: parent.DieReleasePtr(),
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+					})
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: nil,
+			},
 		},
-	}, {
-		Name: "auth-secret-ref provided and secret found",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-					d.SecretRef(corev1.LocalObjectReference{Name: "auth-secret-ref"})
-				})
-			}),
-		GivenObjects: []client.Object{
-			authSecret,
+		"auth-secret-ref provided and secret found": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+						d.SecretRef(corev1.LocalObjectReference{Name: "auth-secret-ref"})
+					})
+				}).DieReleasePtr(),
+			GivenObjects: []client.Object{
+				authSecret,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+						d.SecretRef(corev1.LocalObjectReference{Name: "auth-secret-ref"})
+					})
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: authSecret.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.ResourceVersion("999")
+					}).
+					DieRelease(),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(authSecret, parent, scheme),
+			},
+			ShouldErr: false,
 		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-					d.SecretRef(corev1.LocalObjectReference{Name: "auth-secret-ref"})
-				})
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: authSecret.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.ResourceVersion("999")
+		"auth secret provided but not found": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+						d.SecretRef(corev1.LocalObjectReference{Name: "missing-secret-ref"})
+					})
+				}).DieReleasePtr(),
+			GivenObjects: []client.Object{
+				authSecret,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+						d.SecretRef(corev1.LocalObjectReference{Name: "missing-secret-ref"})
+					})
 				}).
-				DieRelease(),
-		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(authSecret, parent, scheme),
-		},
-		ShouldErr: false,
-	}, {
-		Name: "auth secret provided but not found",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-					d.SecretRef(corev1.LocalObjectReference{Name: "missing-secret-ref"})
-				})
-			}),
-		GivenObjects: []client.Object{
-			authSecret,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-					d.SecretRef(corev1.LocalObjectReference{Name: "missing-secret-ref"})
-				})
-			}).
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").Messagef("Secret %q not found in namespace %q", "missing-secret-ref", "test-namespace"),
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").Messagef("Secret %q not found in namespace %q", "missing-secret-ref", "test-namespace"),
-				)
-			}),
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(missingSecretRef, parent, scheme),
-		},
-	}}
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").Messagef("Secret %q not found in namespace %q", "missing-secret-ref", "test-namespace"),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").Messagef("Secret %q not found in namespace %q", "missing-secret-ref", "test-namespace"),
+					)
+				}).DieReleasePtr(),
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(missingSecretRef, parent, scheme),
+			},
+		}}
 
-	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase, c reconcilers.Config) reconcilers.SubReconciler {
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
 		return controllers.MavenArtifactSecretsSyncReconciler([]controllers.Cert{})
 	})
 }
@@ -198,91 +197,91 @@ func TestMavenArtifactWithCustomCA(t *testing.T) {
 			})
 		})
 
-	rts := rtesting.SubReconcilerTestSuite{{
-		Name: "cert not provided in secret",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-					d.SecretRef(corev1.LocalObjectReference{Name: "nil-cert-in-secret-ref"})
-				})
-			}),
-		GivenObjects: []client.Object{
-			nilCertInSecretRef,
+	rts := rtesting.SubReconcilerTests[*sourcev1alpha1.MavenArtifact]{
+		"cert not provided in secret": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+						d.SecretRef(corev1.LocalObjectReference{Name: "nil-cert-in-secret-ref"})
+					})
+				}).DieReleasePtr(),
+			GivenObjects: []client.Object{
+				nilCertInSecretRef,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+						d.SecretRef(corev1.LocalObjectReference{Name: "nil-cert-in-secret-ref"})
+					})
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: nilCertInSecretRef.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.ResourceVersion("999")
+					}).
+					DieRelease(),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(nilCertInSecretRef, parent, scheme),
+			},
 		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-					d.SecretRef(corev1.LocalObjectReference{Name: "nil-cert-in-secret-ref"})
-				})
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: nilCertInSecretRef.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.ResourceVersion("999")
+		"cert secret provided and secret found": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+						d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+					})
+				}).DieReleasePtr(),
+			GivenObjects: []client.Object{
+				certSecret,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+						d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+					})
+				}).DieReleasePtr(),
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(certSecret, parent, scheme),
+			},
+			ShouldErr: false,
+		},
+		"cert secret provided but not found": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+						d.SecretRef(corev1.LocalObjectReference{Name: "nil-cert-in-secret-ref"})
+					})
+				}).DieReleasePtr(),
+			GivenObjects: []client.Object{
+				certSecret,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(repositoryURL)
+						d.SecretRef(corev1.LocalObjectReference{Name: "nil-cert-in-secret-ref"})
+					})
 				}).
-				DieRelease(),
-		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(nilCertInSecretRef, parent, scheme),
-		},
-	}, {
-		Name: "cert secret provided and secret found",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-					d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
-				})
-			}),
-		GivenObjects: []client.Object{
-			certSecret,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-					d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
-				})
-			}),
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(certSecret, parent, scheme),
-		},
-		ShouldErr: false,
-	}, {
-		Name: "cert secret provided but not found",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-					d.SecretRef(corev1.LocalObjectReference{Name: "nil-cert-in-secret-ref"})
-				})
-			}),
-		GivenObjects: []client.Object{
-			certSecret,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(repositoryURL)
-					d.SecretRef(corev1.LocalObjectReference{Name: "nil-cert-in-secret-ref"})
-				})
-			}).
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").
-						Message(`Secret "nil-cert-in-secret-ref" not found in namespace "test-namespace"`),
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").
-						Message(`Secret "nil-cert-in-secret-ref" not found in namespace "test-namespace"`),
-				)
-			}),
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(nilCertInSecretRef, parent, scheme),
-		},
-	}}
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").
+							Message(`Secret "nil-cert-in-secret-ref" not found in namespace "test-namespace"`),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").
+							Message(`Secret "nil-cert-in-secret-ref" not found in namespace "test-namespace"`),
+					)
+				}).DieReleasePtr(),
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(nilCertInSecretRef, parent, scheme),
+			},
+		}}
 
-	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase, c reconcilers.Config) reconcilers.SubReconciler {
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
 		return controllers.MavenArtifactSecretsSyncReconciler([]controllers.Cert{})
 	})
 }
@@ -727,361 +726,361 @@ func TestMavenArtifactVersionSyncReconciler(t *testing.T) {
 			})
 		})
 
-	rts := rtesting.SubReconcilerTestSuite{{
-		Name:     "release version",
-		Resource: parentWithReleaseVersion,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
-		},
-		ExpectResource: parentWithReleaseVersion.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ObservedGeneration(1)
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
-						Status(metav1.ConditionTrue).
-						Reason("Resolved").
-						Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, releaseVersion, tlsServer.URL, artifactId, releaseVersion, artifactId, releaseVersion, artifactType),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
-				ArtifactVersion:     latestVersion,
-				ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, releaseVersion, artifactType),
-				ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, latestVersion, artifactId, releaseVersion, artifactType),
+	rts := rtesting.SubReconcilerTests[*sourcev1alpha1.MavenArtifact]{
+		"release version": {
+			Resource: parentWithReleaseVersion.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
 			},
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-		},
-	}, {
-		Name:     "latest version",
-		Resource: parentWithLatestVersionPinned,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
-		},
-		ExpectResource: parentWithLatestVersionPinned.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ObservedGeneration(1)
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
-						Status(metav1.ConditionTrue).
-						Reason("Resolved").
-						Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, latestVersion, tlsServer.URL, artifactId, latestVersion, artifactId, latestVersion, artifactType),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
-				ArtifactVersion:     latestVersion,
-				ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, latestVersion, artifactType),
-				ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, latestVersion, artifactId, latestVersion, artifactType),
+			ExpectResource: parentWithReleaseVersion.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ObservedGeneration(1)
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
+							Status(metav1.ConditionTrue).
+							Reason("Resolved").
+							Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, releaseVersion, tlsServer.URL, artifactId, releaseVersion, artifactId, releaseVersion, artifactType),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     latestVersion,
+					ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, releaseVersion, artifactType),
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, latestVersion, artifactId, releaseVersion, artifactType),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
 			},
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
 		},
-	}, {
-		Name:     "latest version with snapshot",
-		Resource: parentWithLatestArtifactSnapshotVersion,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
-		},
-		ExpectResource: parentWithLatestArtifactSnapshotVersion.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ObservedGeneration(1)
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
-						Status(metav1.ConditionTrue).
-						Reason("Resolved").
-						Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, latestSnapshotVersion, tlsServer.URL, latestArtifactId, latestSnapshotVersion, latestArtifactId, latestSnapshotVersion, artifactType),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
-				ArtifactVersion:     latestSnapshotVersion,
-				ResolvedFileName:    fmt.Sprintf("%s-%s.%s", latestArtifactId, latestSnapshotVersion, artifactType),
-				ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, latestArtifactId, latestSnapshotVersion, latestArtifactId, latestSnapshotVersion, artifactType),
+		"latest version": {
+			Resource: parentWithLatestVersionPinned.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
 			},
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-		},
-	}, {
-		Name:     "pinned version",
-		Resource: parentWithPinnedVersion,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
-		},
-		ExpectResource: parentWithPinnedVersion.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ObservedGeneration(1)
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
-						Status(metav1.ConditionTrue).
-						Reason("Resolved").
-						Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, pinnedVersion, tlsServer.URL, artifactId, pinnedVersion, artifactId, pinnedVersion, artifactType),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
-				ArtifactVersion:     pinnedVersion,
-				ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, pinnedVersion, artifactType),
-				ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, pinnedVersion, artifactId, pinnedVersion, artifactType),
+			ExpectResource: parentWithLatestVersionPinned.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ObservedGeneration(1)
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
+							Status(metav1.ConditionTrue).
+							Reason("Resolved").
+							Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, latestVersion, tlsServer.URL, artifactId, latestVersion, artifactId, latestVersion, artifactType),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     latestVersion,
+					ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, latestVersion, artifactType),
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, latestVersion, artifactId, latestVersion, artifactType),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
 			},
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
 		},
-	}, {
-		Name:     "snapshot version",
-		Resource: parentWithSnapshotVersion,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
-		},
-		ExpectResource: parentWithSnapshotVersion.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ObservedGeneration(1)
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
-						Status(metav1.ConditionTrue).
-						Reason("Resolved").
-						Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, snapshotVersion, tlsServer.URL, artifactId, snapshotVersion, artifactId, resolvedSnapshotFileVersion, artifactType),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
-				ArtifactVersion:     snapshotVersion,
-				ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, resolvedSnapshotFileVersion, artifactType),
-				ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, snapshotVersion, artifactId, resolvedSnapshotFileVersion, artifactType),
+		"latest version with snapshot": {
+			Resource: parentWithLatestArtifactSnapshotVersion.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
 			},
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-		},
-	}, {
-		Name:     "snapshot no-version",
-		Resource: parentWithSnapshotNoVersion,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
-		},
-		ExpectResource: parentWithSnapshotNoVersion.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ObservedGeneration(1)
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
-						Status(metav1.ConditionTrue).
-						Reason("Resolved").
-						Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, noVersionSnapshot, tlsServer.URL, artifactId, noVersionSnapshot, artifactId, noVersionSnapshot, artifactType),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
-				ArtifactVersion:     noVersionSnapshot,
-				ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, noVersionSnapshot, artifactType),
-				ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, noVersionSnapshot, artifactId, noVersionSnapshot, artifactType),
+			ExpectResource: parentWithLatestArtifactSnapshotVersion.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ObservedGeneration(1)
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
+							Status(metav1.ConditionTrue).
+							Reason("Resolved").
+							Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, latestSnapshotVersion, tlsServer.URL, latestArtifactId, latestSnapshotVersion, latestArtifactId, latestSnapshotVersion, artifactType),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     latestSnapshotVersion,
+					ResolvedFileName:    fmt.Sprintf("%s-%s.%s", latestArtifactId, latestSnapshotVersion, artifactType),
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, latestArtifactId, latestSnapshotVersion, latestArtifactId, latestSnapshotVersion, artifactType),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
 			},
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
 		},
-	}, {
-		Name:     "missing snapshot metadata",
-		Resource: parentWithBadSnapshotVersion,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+		"pinned version": {
+			Resource: parentWithPinnedVersion.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			ExpectResource: parentWithPinnedVersion.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ObservedGeneration(1)
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
+							Status(metav1.ConditionTrue).
+							Reason("Resolved").
+							Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, pinnedVersion, tlsServer.URL, artifactId, pinnedVersion, artifactId, pinnedVersion, artifactType),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     pinnedVersion,
+					ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, pinnedVersion, artifactType),
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, pinnedVersion, artifactId, pinnedVersion, artifactType),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+			},
 		},
-		ExpectResource: parentWithBadSnapshotVersion.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-						Messagef(`Maven metadata file not found (HTTP 404) for artifact "%v:%v" from repository URL "%s/ca-releases".`, groupId, artifactId, tlsServer.URL),
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-						Messagef(`Maven metadata file not found (HTTP 404) for artifact "%v:%v" from repository URL "%s/ca-releases".`, groupId, artifactId, tlsServer.URL),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+		"snapshot version": {
+			Resource: parentWithSnapshotVersion.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			ExpectResource: parentWithSnapshotVersion.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ObservedGeneration(1)
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
+							Status(metav1.ConditionTrue).
+							Reason("Resolved").
+							Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, snapshotVersion, tlsServer.URL, artifactId, snapshotVersion, artifactId, resolvedSnapshotFileVersion, artifactType),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     snapshotVersion,
+					ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, resolvedSnapshotFileVersion, artifactType),
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, snapshotVersion, artifactId, resolvedSnapshotFileVersion, artifactType),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+			},
 		},
-	}, {
-		Name:     "missing release version",
-		Resource: parentWithMissingReleaseArtifact,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+		"snapshot no-version": {
+			Resource: parentWithSnapshotNoVersion.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			ExpectResource: parentWithSnapshotNoVersion.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ObservedGeneration(1)
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
+							Status(metav1.ConditionTrue).
+							Reason("Resolved").
+							Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, noVersionSnapshot, tlsServer.URL, artifactId, noVersionSnapshot, artifactId, noVersionSnapshot, artifactType),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     noVersionSnapshot,
+					ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, noVersionSnapshot, artifactType),
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, noVersionSnapshot, artifactId, noVersionSnapshot, artifactType),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+			},
 		},
-		ExpectResource: parentWithMissingReleaseArtifact.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("VersionError").Message("artifact metadata does not have a RELEASE version"),
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("VersionError").Message("artifact metadata does not have a RELEASE version"),
-				)
-			}),
-	}, {
-		Name:     "missing artifact",
-		Resource: parentWithMissingArtifact,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+		"missing snapshot metadata": {
+			Resource: parentWithBadSnapshotVersion.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			ExpectResource: parentWithBadSnapshotVersion.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+							Messagef(`Maven metadata file not found (HTTP 404) for artifact "%v:%v" from repository URL "%s/ca-releases".`, groupId, artifactId, tlsServer.URL),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+							Messagef(`Maven metadata file not found (HTTP 404) for artifact "%v:%v" from repository URL "%s/ca-releases".`, groupId, artifactId, tlsServer.URL),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+			},
 		},
-		ExpectResource: parentWithMissingArtifact.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-						Messagef(`Maven metadata file not found (HTTP 404) for artifact "%v:%v" from repository URL "%s/ca-releases".`, groupId, missingArtifactId, tlsServer.URL),
+		"missing release version": {
+			Resource: parentWithMissingReleaseArtifact.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			ExpectResource: parentWithMissingReleaseArtifact.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("VersionError").Message("artifact metadata does not have a RELEASE version"),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("VersionError").Message("artifact metadata does not have a RELEASE version"),
+					)
+				}).DieReleasePtr(),
+		},
+		"missing artifact": {
+			Resource: parentWithMissingArtifact.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			ExpectResource: parentWithMissingArtifact.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+							Messagef(`Maven metadata file not found (HTTP 404) for artifact "%v:%v" from repository URL "%s/ca-releases".`, groupId, missingArtifactId, tlsServer.URL),
 
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-						Messagef(`Maven metadata file not found (HTTP 404) for artifact "%v:%v" from repository URL "%s/ca-releases".`, groupId, missingArtifactId, tlsServer.URL),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey:    nil,
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-		},
-	}, {
-		Name:     "bad artifact data",
-		Resource: parentWithBadArtifact,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
-		},
-		ExpectResource: parentWithBadArtifact.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("VersionError").
-						Messagef(`Error "XML syntax error on line 9: unexpected EOF" while parsing XML data at "%s/ca-releases/org/my-group/%s/maven-metadata.xml"`, tlsServer.URL, badArtifactId),
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("VersionError").
-						Messagef(`Error "XML syntax error on line 9: unexpected EOF" while parsing XML data at "%s/ca-releases/org/my-group/%s/maven-metadata.xml"`, tlsServer.URL, badArtifactId),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
-		},
-	}, {
-		Name:     "metadata protected by TLS",
-		Resource: parentWithCaCertificate,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactHttpClientKey: tlsServer.Client(),
-		},
-		ExpectResource: parentWithCaCertificate.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ObservedGeneration(1)
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
-						Status(metav1.ConditionTrue).
-						Reason("Resolved").
-						Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, latestVersion, tlsServer.URL, artifactId, latestVersion, artifactId, latestVersion, artifactType),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
-				ArtifactVersion:     latestVersion,
-				ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, latestVersion, artifactType),
-				ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, latestVersion, artifactId, latestVersion, artifactType),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+							Messagef(`Maven metadata file not found (HTTP 404) for artifact "%v:%v" from repository URL "%s/ca-releases".`, groupId, missingArtifactId, tlsServer.URL),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey:    nil,
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
 			},
 		},
-	}, {
-		Name: "bad hostname",
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactHttpClientKey: server.Client(),
+		"bad artifact data": {
+			Resource: parentWithBadArtifact.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			ExpectResource: parentWithBadArtifact.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("VersionError").
+							Messagef(`Error "XML syntax error on line 9: unexpected EOF" while parsing XML data at "%s/ca-releases/org/my-group/%s/maven-metadata.xml"`, tlsServer.URL, badArtifactId),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("VersionError").
+							Messagef(`Error "XML syntax error on line 9: unexpected EOF" while parsing XML data at "%s/ca-releases/org/my-group/%s/maven-metadata.xml"`, tlsServer.URL, badArtifactId),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+			},
 		},
-		Resource: parentWithBadHostname,
-		ExpectResource: parentWithBadHostname.
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("ConfigurationError").
-						Messagef(`Error parsing repository URL %q: parse "\t": net/url: invalid control character in URL`, badHostname),
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("ConfigurationError").
-						Messagef(`Error parsing repository URL %q: parse "\t": net/url: invalid control character in URL`, badHostname),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey: nil,
+		"metadata protected by TLS": {
+			Resource: parentWithCaCertificate.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactHttpClientKey: tlsServer.Client(),
+			},
+			ExpectResource: parentWithCaCertificate.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ObservedGeneration(1)
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.
+							Status(metav1.ConditionTrue).
+							Reason("Resolved").
+							Messagef(`Resolved version %q for artifact "%s/ca-releases/org/my-group/%s/%s/%s-%s.%s"`, latestVersion, tlsServer.URL, artifactId, latestVersion, artifactId, latestVersion, artifactType),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     latestVersion,
+					ResolvedFileName:    fmt.Sprintf("%s-%s.%s", artifactId, latestVersion, artifactType),
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/org/my-group/%s/%s/%s-%s.%s", tlsServer.URL, artifactId, latestVersion, artifactId, latestVersion, artifactType),
+				},
+			},
 		},
-	}, {
-		Name: "invalid credentials in download maven artifact metadata request",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
-					d.GroupId(groupId)
-					d.ArtifactId(artifactId)
-					d.Type(artifactType)
-					d.Version("RELEASE")
-				})
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(tlsServerWithCred.URL + "/ca-cred-releases")
-					d.SecretRef(corev1.LocalObjectReference{Name: "invalid-stashed-secret-ref"})
-				})
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: invalidSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServerWithCred.Client(),
+		"bad hostname": {
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactHttpClientKey: server.Client(),
+			},
+			Resource: parentWithBadHostname.DieReleasePtr(),
+			ExpectResource: parentWithBadHostname.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("ConfigurationError").
+							Messagef(`Error parsing repository URL %q: parse "\t": net/url: invalid control character in URL`, badHostname),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("ConfigurationError").
+							Messagef(`Error parsing repository URL %q: parse "\t": net/url: invalid control character in URL`, badHostname),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: nil,
+			},
 		},
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: invalidSecret,
+		"invalid credentials in download maven artifact metadata request": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+						d.GroupId(groupId)
+						d.ArtifactId(artifactId)
+						d.Type(artifactType)
+						d.Version("RELEASE")
+					})
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(tlsServerWithCred.URL + "/ca-cred-releases")
+						d.SecretRef(corev1.LocalObjectReference{Name: "invalid-stashed-secret-ref"})
+					})
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: invalidSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServerWithCred.Client(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: invalidSecret,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+						d.GroupId(groupId)
+						d.ArtifactId(artifactId)
+						d.Type(artifactType)
+						d.Version("RELEASE")
+					})
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(tlsServerWithCred.URL + "/ca-cred-releases")
+						d.SecretRef(corev1.LocalObjectReference{Name: "invalid-stashed-secret-ref"})
+					})
+				}).
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ObservedGeneration(1)
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+							Messagef(`Unauthorized credentials (HTTP 401) error downloading artifact metadata "%v:%v" from repository URL "%v/ca-cred-releases". Check the credentials provided in the Secret.`, groupId, artifactId, tlsServerWithCred.URL),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+							Messagef(`Unauthorized credentials (HTTP 401) error downloading artifact metadata "%v:%v" from repository URL "%v/ca-cred-releases". Check the credentials provided in the Secret.`, groupId, artifactId, tlsServerWithCred.URL),
+					)
+				}).DieReleasePtr(),
 		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
-					d.GroupId(groupId)
-					d.ArtifactId(artifactId)
-					d.Type(artifactType)
-					d.Version("RELEASE")
-				})
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(tlsServerWithCred.URL + "/ca-cred-releases")
-					d.SecretRef(corev1.LocalObjectReference{Name: "invalid-stashed-secret-ref"})
-				})
-			}).
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ObservedGeneration(1)
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-						Messagef(`Unauthorized credentials (HTTP 401) error downloading artifact metadata "%v:%v" from repository URL "%v/ca-cred-releases". Check the credentials provided in the Secret.`, groupId, artifactId, tlsServerWithCred.URL),
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-						Messagef(`Unauthorized credentials (HTTP 401) error downloading artifact metadata "%v:%v" from repository URL "%v/ca-cred-releases". Check the credentials provided in the Secret.`, groupId, artifactId, tlsServerWithCred.URL),
-				)
-			}),
-	}, {
-		Name: "unauthorized credentials in download maven artifact metadata request",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
-					d.GroupId(groupId)
-					d.ArtifactId(artifactId)
-					d.Type(artifactType)
-					d.Version("RELEASE")
-				})
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(tlsServerWithCred.URL + "/ca-cred-releases")
-					d.SecretRef(corev1.LocalObjectReference{Name: "unauthorised-stashed-secret-ref"})
-				})
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validUnAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServerWithCred.Client(),
-		},
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactAuthSecretStashKey: validUnAuthorisedSecret,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
-					d.GroupId(groupId)
-					d.ArtifactId(artifactId)
-					d.Type(artifactType)
-					d.Version("RELEASE")
-				})
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(tlsServerWithCred.URL + "/ca-cred-releases")
-					d.SecretRef(corev1.LocalObjectReference{Name: "unauthorised-stashed-secret-ref"})
-				})
-			}).
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ObservedGeneration(1)
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-						Messagef(`Unauthorized credentials (HTTP 401) error downloading artifact metadata "%v:%v" from repository URL "%v/ca-cred-releases". Check the credentials provided in the Secret.`, groupId, artifactId, tlsServerWithCred.URL),
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-						Messagef(`Unauthorized credentials (HTTP 401) error downloading artifact metadata "%v:%v" from repository URL "%v/ca-cred-releases". Check the credentials provided in the Secret.`, groupId, artifactId, tlsServerWithCred.URL),
-				)
-			}),
-	}}
+		"unauthorized credentials in download maven artifact metadata request": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+						d.GroupId(groupId)
+						d.ArtifactId(artifactId)
+						d.Type(artifactType)
+						d.Version("RELEASE")
+					})
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(tlsServerWithCred.URL + "/ca-cred-releases")
+						d.SecretRef(corev1.LocalObjectReference{Name: "unauthorised-stashed-secret-ref"})
+					})
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validUnAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServerWithCred.Client(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validUnAuthorisedSecret,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+						d.GroupId(groupId)
+						d.ArtifactId(artifactId)
+						d.Type(artifactType)
+						d.Version("RELEASE")
+					})
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(tlsServerWithCred.URL + "/ca-cred-releases")
+						d.SecretRef(corev1.LocalObjectReference{Name: "unauthorised-stashed-secret-ref"})
+					})
+				}).
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ObservedGeneration(1)
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+							Messagef(`Unauthorized credentials (HTTP 401) error downloading artifact metadata "%v:%v" from repository URL "%v/ca-cred-releases". Check the credentials provided in the Secret.`, groupId, artifactId, tlsServerWithCred.URL),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+							Messagef(`Unauthorized credentials (HTTP 401) error downloading artifact metadata "%v:%v" from repository URL "%v/ca-cred-releases". Check the credentials provided in the Secret.`, groupId, artifactId, tlsServerWithCred.URL),
+					)
+				}).DieReleasePtr(),
+		}}
 
-	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase, c reconcilers.Config) reconcilers.SubReconciler {
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
 		return controllers.MavenArtifactVersionSyncReconciler()
 	})
 }
@@ -1127,7 +1126,7 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 				return
 			}
 			if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, artifactId, artifactVersion, fileName) {
-				fileBytes, err := ioutil.ReadFile("fixtures/maven-artifact/helloworld-1.1.jar")
+				fileBytes, err := os.ReadFile("fixtures/maven-artifact/helloworld-1.1.jar")
 				if err != nil {
 					panic(err)
 				}
@@ -1141,7 +1140,7 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(checksum))
 			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, artifactId, artifactVersion, fileName) {
-				fileBytes, err := ioutil.ReadFile("fixtures/maven-artifact/helloworld-1.1.jar")
+				fileBytes, err := os.ReadFile("fixtures/maven-artifact/helloworld-1.1.jar")
 				if err != nil {
 					panic(err)
 				}
@@ -1155,7 +1154,7 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(checksum))
 			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, artifactId, artifactVersion, fileNameAndClassifier) {
-				fileBytes, err := ioutil.ReadFile("fixtures/maven-artifact/helloworld-1.1.jar")
+				fileBytes, err := os.ReadFile("fixtures/maven-artifact/helloworld-1.1.jar")
 				if err != nil {
 					panic(err)
 				}
@@ -1169,7 +1168,7 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(checksum))
 			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, artifactId, artifactVersion, fileNameWithZip) {
-				fileBytes, err := ioutil.ReadFile("fixtures/maven-artifact/helloworld-1.1.zip")
+				fileBytes, err := os.ReadFile("fixtures/maven-artifact/helloworld-1.1.zip")
 				if err != nil {
 					panic(err)
 				}
@@ -1200,7 +1199,7 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(sourcev1alpha1.AddToScheme(scheme))
 
-	artifactRootDir, err := ioutil.TempDir(os.TempDir(), "maven-artifacts.*")
+	artifactRootDir, err := os.MkdirTemp(os.TempDir(), "maven-artifacts.*")
 	utilruntime.Must(err)
 	defer os.RemoveAll(artifactRootDir)
 
@@ -1296,6 +1295,7 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 				diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
 			)
 		})
+
 	var (
 		validAuthorisedSecret = corev1.Secret{
 			Type: corev1.BasicAuthUsernameKey,
@@ -1327,10 +1327,9 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 			Data: map[string][]byte{"username": []byte(""), "password": []byte("invalidpass")},
 		}
 	)
-	successRTS := rtesting.SubReconcilerTestSuite{
-		{
-			Name:     "download a zip",
-			Resource: parentWithZip,
+	successRTS := rtesting.SubReconcilerTests[*sourcev1alpha1.MavenArtifact]{
+		"download a zip": {
+			Resource: parentWithZip.DieReleasePtr(),
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
 				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
 					ArtifactVersion:     artifactVersion,
@@ -1366,10 +1365,10 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
 						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
 					)
-				}),
-		}, {
-			Name:     "download fail missing zip",
-			Resource: parentWithBadZip,
+				}).DieReleasePtr(),
+		},
+		"download fail missing zip": {
+			Resource: parentWithBadZip.DieReleasePtr(),
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
 				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
 					ArtifactVersion:     artifactVersion,
@@ -1400,10 +1399,10 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("DownloadError").
 							Messagef(`Maven artifact file not found (HTTP 404) at URL "%s/ca-releases/my-group/%s/1.1/%s-1.1.zip".`, tlsServer.URL, failDownloadArtifact, failDownloadArtifact),
 					)
-				}),
-		}, {
-			Name:     "download artifact without classifier",
-			Resource: parentWithoutClassifier,
+				}).DieReleasePtr(),
+		},
+		"download artifact without classifier": {
+			Resource: parentWithoutClassifier.DieReleasePtr(),
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
 				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
 					ArtifactVersion:     artifactVersion,
@@ -1439,10 +1438,10 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
 						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
 					)
-				}),
-		}, {
-			Name:     "download artifact with classifier",
-			Resource: parentWithClassifier,
+				}).DieReleasePtr(),
+		},
+		"download artifact with classifier": {
+			Resource: parentWithClassifier.DieReleasePtr(),
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
 				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
 					ArtifactVersion:     artifactVersion,
@@ -1479,10 +1478,10 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
 						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
 					)
-				}),
-		}, {
-			Name: "Update http host URL",
-			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase) (context.Context, error) {
+				}).DieReleasePtr(),
+		},
+		"Update http host URL": {
+			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact]) (context.Context, error) {
 				dir := path.Join(artifactRootDir, "mavenartifact", namespace, name)
 				if err := os.MkdirAll(dir, 0755); err != nil {
 					return ctx, err
@@ -1503,7 +1502,7 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						d.Checksum(checksum)
 					})
 					d.URL("http://localhost.example/mavenartifact/test-namespace/my-maven-artifact/" + artifactJarToTgzFilename + ".tar.gz")
-				}),
+				}).DieReleasePtr(),
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
 				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
 					ArtifactVersion:     artifactVersion,
@@ -1537,14 +1536,14 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 					d.ConditionsDie(
 						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
 					)
-				}),
-			CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase) error {
+				}).DieReleasePtr(),
+			CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact]) error {
 				artifact := path.Join(artifactRootDir, "mavenartifact")
 				os.RemoveAll(artifact)
 				return nil
 			},
-		}, {
-			Name: "artifact was not found",
+		},
+		"artifact was not found": {
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
 				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
 					ArtifactVersion:     artifactVersion,
@@ -1561,7 +1560,7 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						d.ArtifactId(badArtifactId)
 						d.GroupId(groupId)
 					})
-				}),
+				}).DieReleasePtr(),
 			ExpectResource: parent.
 				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
 					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
@@ -1582,10 +1581,10 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
 							Messagef(`Maven artifact checksum file not found (HTTP 404) at URL "%s/ca-releases/my-group/%s/1.1/%s-1.1.jar.sha1".`, tlsServer.URL, badArtifactId, badArtifactId),
 					)
-				}),
-		}, {
-			Name:     "authentication was not stashed",
-			Resource: parent,
+				}).DieReleasePtr(),
+		},
+		"authentication was not stashed": {
+			Resource: parent.DieReleasePtr(),
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
 				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
 					ArtifactVersion:     artifactVersion,
@@ -1614,10 +1613,10 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
 							Messagef(`Unauthorized credentials (HTTP 401) error downloading Maven artifact checksum from URL "%v/ca-releases/my-group/helloworld/1.1/helloworld-1.1.jar.sha1". Check the credentials provided in the Secret.`, tlsServer.URL),
 					)
-				}),
-		}, {
-			Name:     "download artifact protected by TLS",
-			Resource: parentWithCaCertificate,
+				}).DieReleasePtr(),
+		},
+		"download artifact protected by TLS": {
+			Resource: parentWithCaCertificate.DieReleasePtr(),
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
 				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
 					ArtifactVersion:     artifactVersion,
@@ -1653,10 +1652,10 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
 						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
 					)
-				}),
-		}, {
-			Name:     "download artifact protected by TLS but certificate empty",
-			Resource: parentWithCaCertificate,
+				}).DieReleasePtr(),
+		},
+		"download artifact protected by TLS but certificate empty": {
+			Resource: parentWithCaCertificate.DieReleasePtr(),
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
 				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
 					ArtifactVersion:     artifactVersion,
@@ -1685,79 +1684,79 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
 							Messagef(`Unauthorized credentials (HTTP 401) error downloading Maven artifact checksum from URL "%v/ca-releases/my-group/helloworld/1.1/helloworld-1.1.jar.sha1". Check the credentials provided in the Secret.`, tlsServer.URL),
 					)
-				}),
+				}).DieReleasePtr(),
 		}}
 
-	successRTS.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase, c reconcilers.Config) reconcilers.SubReconciler {
+	successRTS.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
 		return controllers.MavenArtifactDownloadSyncReconciler(artifactRootDir, "artifact.example", now)
 	})
 
-	failRTS := rtesting.SubReconcilerTestSuite{{
-		Name:     "invalid credentials in download artifact request",
-		Resource: parent,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
-				ArtifactVersion:     artifactVersion,
-				ResolvedFileName:    fileName,
-				ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/my-group/%s/%s/%s", tlsServer.URL, artifactId, artifactVersion, fileName),
+	failRTS := rtesting.SubReconcilerTests[*sourcev1alpha1.MavenArtifact]{
+		"invalid credentials in download artifact request": {
+			Resource: parent.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     artifactVersion,
+					ResolvedFileName:    fileName,
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/my-group/%s/%s/%s", tlsServer.URL, artifactId, artifactVersion, fileName),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: invalidSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
 			},
-			controllers.MavenArtifactAuthSecretStashKey: invalidSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(tlsServer.URL + "/ca-releases")
+						d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+					})
+					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+						d.Type("jar")
+						d.ArtifactId(artifactId)
+						d.GroupId(groupId)
+					})
+				}).
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+							Messagef(`Unauthorized credentials (HTTP 401) error downloading Maven artifact checksum from URL "%v/ca-releases/my-group/helloworld/1.1/helloworld-1.1.jar.sha1". Check the credentials provided in the Secret.`, tlsServer.URL),
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+							Messagef(`Unauthorized credentials (HTTP 401) error downloading Maven artifact checksum from URL "%v/ca-releases/my-group/helloworld/1.1/helloworld-1.1.jar.sha1". Check the credentials provided in the Secret.`, tlsServer.URL),
+					)
+				}).DieReleasePtr(),
 		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(tlsServer.URL + "/ca-releases")
-					d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
-				})
-				d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
-					d.Type("jar")
-					d.ArtifactId(artifactId)
-					d.GroupId(groupId)
-				})
-			}).
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-						Messagef(`Unauthorized credentials (HTTP 401) error downloading Maven artifact checksum from URL "%v/ca-releases/my-group/helloworld/1.1/helloworld-1.1.jar.sha1". Check the credentials provided in the Secret.`, tlsServer.URL),
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-						Messagef(`Unauthorized credentials (HTTP 401) error downloading Maven artifact checksum from URL "%v/ca-releases/my-group/helloworld/1.1/helloworld-1.1.jar.sha1". Check the credentials provided in the Secret.`, tlsServer.URL),
-				)
-			}),
-	}, {
-		Name:     "valid but incorrect credentials in download artifact request",
-		Resource: parent,
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
-				ArtifactVersion:     artifactVersion,
-				ResolvedFileName:    fileName,
-				ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/my-group/%s/%s/%s", tlsServer.URL, artifactId, artifactVersion, fileName),
+		"valid but incorrect credentials in download artifact request": {
+			Resource: parent.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     artifactVersion,
+					ResolvedFileName:    fileName,
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/my-group/%s/%s/%s", tlsServer.URL, artifactId, artifactVersion, fileName),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validUnAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
 			},
-			controllers.MavenArtifactAuthSecretStashKey: validUnAuthorisedSecret,
-			controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-				d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-					d.URL(tlsServer.URL + "/ca-releases")
-					d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
-				})
-				d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
-					d.Type("jar")
-					d.ArtifactId(artifactId)
-					d.GroupId(groupId)
-				})
-			}).
-			StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionFalse).Reason("RemoteError").Messagef(`Unauthorized credentials (HTTP 401) error downloading Maven artifact checksum from URL "%s/ca-releases/my-group/helloworld/1.1/helloworld-1.1.jar.sha1". Check the credentials provided in the Secret.`, tlsServer.URL),
-					diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
-					diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").Messagef(`Unauthorized credentials (HTTP 401) error downloading Maven artifact checksum from URL "%s/ca-releases/my-group/helloworld/1.1/helloworld-1.1.jar.sha1". Check the credentials provided in the Secret.`, tlsServer.URL),
-				)
-			}),
-	}}
-	failRTS.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase, c reconcilers.Config) reconcilers.SubReconciler {
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(tlsServer.URL + "/ca-releases")
+						d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+					})
+					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+						d.Type("jar")
+						d.ArtifactId(artifactId)
+						d.GroupId(groupId)
+					})
+				}).
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionFalse).Reason("RemoteError").Messagef(`Unauthorized credentials (HTTP 401) error downloading Maven artifact checksum from URL "%s/ca-releases/my-group/helloworld/1.1/helloworld-1.1.jar.sha1". Check the credentials provided in the Secret.`, tlsServer.URL),
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").Messagef(`Unauthorized credentials (HTTP 401) error downloading Maven artifact checksum from URL "%s/ca-releases/my-group/helloworld/1.1/helloworld-1.1.jar.sha1". Check the credentials provided in the Secret.`, tlsServer.URL),
+					)
+				}).DieReleasePtr(),
+		}}
+	failRTS.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
 		return controllers.MavenArtifactDownloadSyncReconciler(artifactRootDir, "artifact.example", now)
 	})
 }
@@ -1765,7 +1764,7 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 func TestMavenArtifactReconciler(t *testing.T) {
 	namespace := "test-namespace"
 	name := "my-maven-artifact"
-	key := types.NamespacedName{Namespace: namespace, Name: name}
+	request := reconcilers.Request{NamespacedName: types.NamespacedName{Namespace: namespace, Name: name}}
 
 	groupId := "my-group"
 	artifactId := "helloworld"
@@ -1788,7 +1787,7 @@ func TestMavenArtifactReconciler(t *testing.T) {
 				return
 			}
 			if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, artifactId, latestVersion, fileName) {
-				fileBytes, err := ioutil.ReadFile("fixtures/maven-artifact/helloworld-1.1.jar")
+				fileBytes, err := os.ReadFile("fixtures/maven-artifact/helloworld-1.1.jar")
 				if err != nil {
 					panic(err)
 				}
@@ -1809,7 +1808,7 @@ func TestMavenArtifactReconciler(t *testing.T) {
 	}))
 	defer tlsServer.Close()
 
-	artifactRootDir, err := ioutil.TempDir(os.TempDir(), "artifacts.*")
+	artifactRootDir, err := os.MkdirTemp(os.TempDir(), "artifacts.*")
 	utilruntime.Must(err)
 	defer os.RemoveAll(artifactRootDir)
 
@@ -1835,181 +1834,184 @@ func TestMavenArtifactReconciler(t *testing.T) {
 			d.Generation(1)
 		})
 
-	rts := rtesting.ReconcilerTestSuite{{
-		Name: "requeue interval",
-		Key:  key,
-		GivenObjects: []client.Object{
-			parent.
-				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
-						d.Type("jar")
-						d.ArtifactId(artifactId)
-						d.GroupId(groupId)
-						d.Version(latestVersion)
-					})
-					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-						d.URL(tlsServer.URL + "/ca-releases")
-						d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
-					})
-					d.Interval(metav1.Duration{Duration: 5 * time.Minute})
-					d.Timeout(&metav1.Duration{Duration: 5 * time.Minute})
-				}),
-			certSecret,
-		},
+	rts := rtesting.ReconcilerTests{
+		"requeue interval": {
+			Request: request,
+			StatusSubResourceTypes: []client.Object{
+				&sourcev1alpha1.MavenArtifact{},
+			},
+			GivenObjects: []client.Object{
+				parent.
+					SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+						d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+							d.Type("jar")
+							d.ArtifactId(artifactId)
+							d.GroupId(groupId)
+							d.Version(latestVersion)
+						})
+						d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+							d.URL(tlsServer.URL + "/ca-releases")
+							d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+						})
+						d.Interval(metav1.Duration{Duration: 5 * time.Minute})
+						d.Timeout(&metav1.Duration{Duration: 5 * time.Minute})
+					}),
+				certSecret,
+			},
 
-		ExpectStatusUpdates: []client.Object{
-			parent.
-				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-						d.Revision(fileName)
-						d.Path(fmt.Sprintf("mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
+			ExpectStatusUpdates: []client.Object{
+				parent.
+					StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+						d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+							d.Revision(fileName)
+							d.Path(fmt.Sprintf("mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
+							d.URL(fmt.Sprintf("http://artifact.example/mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
+							d.LastUpdateTime(now())
+							d.Checksum(checksum)
+						})
 						d.URL(fmt.Sprintf("http://artifact.example/mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
-						d.LastUpdateTime(now())
-						d.Checksum(checksum)
-					})
-					d.URL(fmt.Sprintf("http://artifact.example/mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
-					d.ObservedGeneration(1)
-					d.ConditionsDie(
-						diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
-						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved").Messagef(`Resolved version %q for artifact "%s/%s/%s/%s/%s-%s.jar"`, latestVersion, tlsServer.URL+"/ca-releases", groupId, artifactId, latestVersion, artifactId, latestVersion),
-						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
-					)
-				}),
-		},
+						d.ObservedGeneration(1)
+						d.ConditionsDie(
+							diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+							diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved").Messagef(`Resolved version %q for artifact "%s/%s/%s/%s/%s-%s.jar"`, latestVersion, tlsServer.URL+"/ca-releases", groupId, artifactId, latestVersion, artifactId, latestVersion),
+							diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+						)
+					}),
+			},
 
-		ExpectPatches: []rtesting.PatchRef{
-			{
-				Group:     "source.apps.tanzu.vmware.com",
-				Kind:      "MavenArtifact",
-				Namespace: parent.GetNamespace(),
-				Name:      parent.GetName(),
-				PatchType: types.MergePatchType,
-				Patch:     []byte(`{"metadata":{"finalizers":["source.apps.tanzu.vmware.com/finalizer"],"resourceVersion":"999"}}`),
+			ExpectPatches: []rtesting.PatchRef{
+				{
+					Group:     "source.apps.tanzu.vmware.com",
+					Kind:      "MavenArtifact",
+					Namespace: parent.GetNamespace(),
+					Name:      parent.GetName(),
+					PatchType: types.MergePatchType,
+					Patch:     []byte(`{"metadata":{"finalizers":["source.apps.tanzu.vmware.com/finalizer"],"resourceVersion":"999"}}`),
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "StatusUpdated", `Updated status`),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(certSecret, parent, scheme),
+			},
+			ExpectedResult: reconcile.Result{
+				RequeueAfter: 5 * time.Minute,
 			},
 		},
-		ExpectEvents: []rtesting.Event{
-			rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
-			rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "StatusUpdated", `Updated status`),
-		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(certSecret, parent, scheme),
-		},
-		ExpectedResult: reconcile.Result{
-			RequeueAfter: 5 * time.Minute,
-		},
-	}, {
-		Name: "skip download",
-		Key:  key,
-		Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
-			dir := path.Join(artifactRootDir, "mavenartifact", namespace, name)
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return ctx, err
-			}
+		"skip download": {
+			Request: request,
+			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
+				dir := path.Join(artifactRootDir, "mavenartifact", namespace, name)
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					return ctx, err
+				}
 
-			return ctx, setCache(fmt.Sprintf("%s/helloworld-1.1.jar.sha1", dir), fmt.Sprintf("%s/my-group/helloworld/1.1/helloworld-1.1.jar|%s", tlsServer.URL+"/ca-releases", "8fdea0bf0e6441c8717853230a270e4ed51cd77a"))
-		},
-		GivenObjects: []client.Object{
-			parent.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Namespace(namespace)
-					d.Name(name)
-					d.Generation(1)
-				}).
-				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
-					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
-						d.Type("jar")
-						d.ArtifactId(artifactId)
-						d.GroupId(groupId)
-						d.Version(latestVersion)
-					})
-					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
-						d.URL(tlsServer.URL + "/ca-releases")
-						d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
-					})
-					d.Interval(metav1.Duration{Duration: 5 * time.Minute})
-					d.Timeout(&metav1.Duration{Duration: 5 * time.Minute})
-				}).
-				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
-					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-						d.Revision(fileName)
-						d.Path(fmt.Sprintf("mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
+				return ctx, setCache(fmt.Sprintf("%s/helloworld-1.1.jar.sha1", dir), fmt.Sprintf("%s/my-group/helloworld/1.1/helloworld-1.1.jar|%s", tlsServer.URL+"/ca-releases", "8fdea0bf0e6441c8717853230a270e4ed51cd77a"))
+			},
+			GivenObjects: []client.Object{
+				parent.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.Namespace(namespace)
+						d.Name(name)
+						d.Generation(1)
+					}).
+					SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+						d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+							d.Type("jar")
+							d.ArtifactId(artifactId)
+							d.GroupId(groupId)
+							d.Version(latestVersion)
+						})
+						d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+							d.URL(tlsServer.URL + "/ca-releases")
+							d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+						})
+						d.Interval(metav1.Duration{Duration: 5 * time.Minute})
+						d.Timeout(&metav1.Duration{Duration: 5 * time.Minute})
+					}).
+					StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+						d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+							d.Revision(fileName)
+							d.Path(fmt.Sprintf("mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
+							d.URL(fmt.Sprintf("http://artifact.example/mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
+							d.LastUpdateTime(now())
+							d.Checksum(checksum)
+						})
 						d.URL(fmt.Sprintf("http://artifact.example/mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
-						d.LastUpdateTime(now())
-						d.Checksum(checksum)
-					})
-					d.URL(fmt.Sprintf("http://artifact.example/mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
-					d.ObservedGeneration(1)
-					d.ConditionsDie(
-						diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
-						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved").Messagef(`Resolved version %q for artifact "%s/%s/%s/%s/%s-%s.jar"`, latestVersion, tlsServer.URL+"/ca-releases", groupId, artifactId, latestVersion, artifactId, latestVersion),
-						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
-					)
-				}),
-			certSecret,
-		},
+						d.ObservedGeneration(1)
+						d.ConditionsDie(
+							diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+							diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved").Messagef(`Resolved version %q for artifact "%s/%s/%s/%s/%s-%s.jar"`, latestVersion, tlsServer.URL+"/ca-releases", groupId, artifactId, latestVersion, artifactId, latestVersion),
+							diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+						)
+					}),
+				certSecret,
+			},
 
-		ExpectPatches: []rtesting.PatchRef{
-			{
-				Group:     "source.apps.tanzu.vmware.com",
-				Kind:      "MavenArtifact",
-				Namespace: parent.GetNamespace(),
-				Name:      parent.GetName(),
-				PatchType: types.MergePatchType,
-				Patch:     []byte(`{"metadata":{"finalizers":["source.apps.tanzu.vmware.com/finalizer"],"resourceVersion":"999"}}`),
+			ExpectPatches: []rtesting.PatchRef{
+				{
+					Group:     "source.apps.tanzu.vmware.com",
+					Kind:      "MavenArtifact",
+					Namespace: parent.GetNamespace(),
+					Name:      parent.GetName(),
+					PatchType: types.MergePatchType,
+					Patch:     []byte(`{"metadata":{"finalizers":["source.apps.tanzu.vmware.com/finalizer"],"resourceVersion":"999"}}`),
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(certSecret, parent, scheme),
+			},
+			ExpectedResult: reconcile.Result{
+				RequeueAfter: 5 * time.Minute,
 			},
 		},
-		ExpectEvents: []rtesting.Event{
-			rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
-		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(certSecret, parent, scheme),
-		},
-		ExpectedResult: reconcile.Result{
-			RequeueAfter: 5 * time.Minute,
-		},
-	}, {
-		Name: "cleanup",
-		Key:  key,
-		Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
-			dir := path.Join(artifactRootDir, "mavenartifact", namespace, name)
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return ctx, err
-			}
-			if _, err := os.Create(path.Join(dir, artifactId+".tar.gz")); err != nil {
-				return ctx, err
-			}
+		"cleanup": {
+			Request: request,
+			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
+				dir := path.Join(artifactRootDir, "mavenartifact", namespace, name)
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					return ctx, err
+				}
+				if _, err := os.Create(path.Join(dir, artifactId+".tar.gz")); err != nil {
+					return ctx, err
+				}
 
-			return ctx, nil
-		},
-		CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) error {
-			dir := path.Join(artifactRootDir, "mavenartifact", namespace, name)
-			if _, err := os.Stat(dir); !os.IsNotExist(err) {
-				return fmt.Errorf("artifact directory should no longer exist")
-			}
-			return nil
-		},
-		GivenObjects: []client.Object{
-			parent.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					t := now()
-					d.DeletionTimestamp(&t)
-					d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
-				}),
-		},
-		ExpectEvents: []rtesting.Event{
-			rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
-		},
-		ExpectPatches: []rtesting.PatchRef{
-			{
-				Group:     "source.apps.tanzu.vmware.com",
-				Kind:      "MavenArtifact",
-				Namespace: parent.GetNamespace(),
-				Name:      parent.GetName(),
-				PatchType: types.MergePatchType,
-				Patch:     []byte(`{"metadata":{"finalizers":null,"resourceVersion":"999"}}`),
+				return ctx, nil
 			},
-		},
-	}}
+			CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) error {
+				dir := path.Join(artifactRootDir, "mavenartifact", namespace, name)
+				if _, err := os.Stat(dir); !os.IsNotExist(err) {
+					return fmt.Errorf("artifact directory should no longer exist")
+				}
+				return nil
+			},
+			GivenObjects: []client.Object{
+				parent.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						t := now()
+						d.DeletionTimestamp(&t)
+						d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
+					}),
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
+			},
+			ExpectPatches: []rtesting.PatchRef{
+				{
+					Group:     "source.apps.tanzu.vmware.com",
+					Kind:      "MavenArtifact",
+					Namespace: parent.GetNamespace(),
+					Name:      parent.GetName(),
+					PatchType: types.MergePatchType,
+					Patch:     []byte(`{"metadata":{"finalizers":null,"resourceVersion":"999"}}`),
+				},
+			},
+		}}
 
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.ReconcilerTestCase, c reconcilers.Config) reconcile.Reconciler {
 		// drop the artifactRootDir between test cases

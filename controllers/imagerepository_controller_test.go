@@ -19,7 +19,6 @@ package controllers_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -47,7 +46,7 @@ import (
 func TestImageRepositoryReconciler(t *testing.T) {
 	namespace := "test-namespace"
 	name := "my-image"
-	key := types.NamespacedName{Namespace: namespace, Name: name}
+	request := reconcilers.Request{NamespacedName: types.NamespacedName{Namespace: namespace, Name: name}}
 
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -62,7 +61,7 @@ func TestImageRepositoryReconciler(t *testing.T) {
 	helloChecksum := "00a04fda65d6d2c7924a2729b8369efbe3f4e978"
 	utilruntime.Must(btesting.LoadImage(registry, "fixtures/hello.tar", helloImage))
 
-	artifactRootDir, err := ioutil.TempDir(os.TempDir(), "artifacts.*")
+	artifactRootDir, err := os.MkdirTemp(os.TempDir(), "artifacts.*")
 	utilruntime.Must(err)
 	defer os.RemoveAll(artifactRootDir)
 
@@ -85,230 +84,240 @@ func TestImageRepositoryReconciler(t *testing.T) {
 			d.Name("default")
 		})
 
-	rts := rtesting.ReconcilerTestSuite{{
-		Name: "in sync",
-		Key:  key,
-		Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
-			dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return ctx, err
-			}
-			if _, err := os.Create(path.Join(dir, helloDigest+".tar.gz")); err != nil {
-				return ctx, err
-			}
+	rts := rtesting.ReconcilerTests{
+		"in sync": {
+			Request: request,
+			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
+				dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					return ctx, err
+				}
+				if _, err := os.Create(path.Join(dir, helloDigest+".tar.gz")); err != nil {
+					return ctx, err
+				}
 
-			return ctx, nil
-		},
-		GivenObjects: []client.Object{
-			parent.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
-				}).
-				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-					d.Image(helloImage)
-				}).
-				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-					d.ObservedGeneration(1)
-					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-						d.Revision(fmt.Sprintf("%s:latest@sha256:%s", helloImage, helloDigest))
-						d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+				return ctx, nil
+			},
+			GivenObjects: []client.Object{
+				parent.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
+					}).
+					SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+						d.Image(helloImage)
+					}).
+					StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+						d.ObservedGeneration(1)
+						d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+							d.Revision(fmt.Sprintf("%s:latest@sha256:%s", helloImage, helloDigest))
+							d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+							d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+							d.Checksum(helloChecksum)
+							// use an old timestamp as an indication the resource wasn't updated
+							d.LastUpdateTime(metav1.Time{Time: time.Unix(100, 0)})
+						})
 						d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-						d.Checksum(helloChecksum)
-						// use an old timestamp as an indication the resource wasn't updated
-						d.LastUpdateTime(metav1.Time{Time: time.Unix(100, 0)})
-					})
-					d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-					d.ConditionsDie(
-						diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
-						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
-						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
-					)
-				}),
-			defaultServiceAccount,
-		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
-		},
-	}, {
-		Name: "resolve image and pull",
-		Key:  key,
-		GivenObjects: []client.Object{
-			parent.
-				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-					d.Image(helloImage)
-				}),
-			defaultServiceAccount,
-		},
-		ExpectStatusUpdates: []client.Object{
-			parent.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
-					d.ResourceVersion("1000")
-				}).
-				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-					d.Image(helloImage)
-				}).
-				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-					d.ObservedGeneration(1)
-					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-						d.Revision(fmt.Sprintf("%s:latest@sha256:%s", helloImage, helloDigest))
-						d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-						d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-						d.Checksum(helloChecksum)
-						d.LastUpdateTime(now())
-					})
-					d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-					d.ConditionsDie(
-						diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
-						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
-						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
-					)
-				}),
-		},
-		ExpectEvents: []rtesting.Event{
-			rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
-			rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "StatusUpdated", "Updated status"),
-		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
-		},
-		ExpectPatches: []rtesting.PatchRef{
-			{
-				Group:     "source.apps.tanzu.vmware.com",
-				Kind:      "ImageRepository",
-				Namespace: parent.GetNamespace(),
-				Name:      parent.GetName(),
-				PatchType: types.MergePatchType,
-				Patch:     []byte(`{"metadata":{"finalizers":["source.apps.tanzu.vmware.com/finalizer"],"resourceVersion":"999"}}`),
+						d.ConditionsDie(
+							diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+							diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+							diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+						)
+					}),
+				defaultServiceAccount,
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
 			},
 		},
-	}, {
-		Name: "cleanup",
-		Key:  key,
-		Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
-			dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return ctx, err
-			}
-			if _, err := os.Create(path.Join(dir, helloDigest+".tar.gz")); err != nil {
-				return ctx, err
-			}
-
-			return ctx, nil
-		},
-		CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) error {
-			dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
-			if _, err := os.Stat(dir); !os.IsNotExist(err) {
-				return fmt.Errorf("artifact directory should no longer exist")
-			}
-			return nil
-		},
-		GivenObjects: []client.Object{
-			parent.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					t := now()
-					d.DeletionTimestamp(&t)
-					d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
-				}),
-			defaultServiceAccount,
-		},
-		ExpectEvents: []rtesting.Event{
-			rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
-		},
-		ExpectPatches: []rtesting.PatchRef{
-			{
-				Group:     "source.apps.tanzu.vmware.com",
-				Kind:      "ImageRepository",
-				Namespace: parent.GetNamespace(),
-				Name:      parent.GetName(),
-				PatchType: types.MergePatchType,
-				Patch:     []byte(`{"metadata":{"finalizers":null,"resourceVersion":"999"}}`),
+		"resolve image and pull": {
+			Request: request,
+			StatusSubResourceTypes: []client.Object{
+				&sourcev1alpha1.ImageRepository{},
+			},
+			GivenObjects: []client.Object{
+				parent.
+					SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+						d.Image(helloImage)
+					}),
+				defaultServiceAccount,
+			},
+			ExpectStatusUpdates: []client.Object{
+				parent.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
+						d.ResourceVersion("1000")
+					}).
+					SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+						d.Image(helloImage)
+					}).
+					StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+						d.ObservedGeneration(1)
+						d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+							d.Revision(fmt.Sprintf("%s:latest@sha256:%s", helloImage, helloDigest))
+							d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+							d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+							d.Checksum(helloChecksum)
+							d.LastUpdateTime(now())
+						})
+						d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.ConditionsDie(
+							diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+							diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+							diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+						)
+					}),
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "StatusUpdated", "Updated status"),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+			},
+			ExpectPatches: []rtesting.PatchRef{
+				{
+					Group:     "source.apps.tanzu.vmware.com",
+					Kind:      "ImageRepository",
+					Namespace: parent.GetNamespace(),
+					Name:      parent.GetName(),
+					PatchType: types.MergePatchType,
+					Patch:     []byte(`{"metadata":{"finalizers":["source.apps.tanzu.vmware.com/finalizer"],"resourceVersion":"999"}}`),
+				},
 			},
 		},
-	}, {
-		Name: "requeue interval",
-		Key:  key,
-		Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
-			dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return ctx, err
-			}
-			if _, err := os.Create(path.Join(dir, helloDigest+".tar.gz")); err != nil {
-				return ctx, err
-			}
+		"cleanup": {
+			Request: request,
+			StatusSubResourceTypes: []client.Object{
+				&sourcev1alpha1.ImageRepository{},
+			},
+			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
+				dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					return ctx, err
+				}
+				if _, err := os.Create(path.Join(dir, helloDigest+".tar.gz")); err != nil {
+					return ctx, err
+				}
 
-			return ctx, nil
+				return ctx, nil
+			},
+			CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) error {
+				dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
+				if _, err := os.Stat(dir); !os.IsNotExist(err) {
+					return fmt.Errorf("artifact directory should no longer exist")
+				}
+				return nil
+			},
+			GivenObjects: []client.Object{
+				parent.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						t := now()
+						d.DeletionTimestamp(&t)
+						d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
+					}),
+				defaultServiceAccount,
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
+			},
+			ExpectPatches: []rtesting.PatchRef{
+				{
+					Group:     "source.apps.tanzu.vmware.com",
+					Kind:      "ImageRepository",
+					Namespace: parent.GetNamespace(),
+					Name:      parent.GetName(),
+					PatchType: types.MergePatchType,
+					Patch:     []byte(`{"metadata":{"finalizers":null,"resourceVersion":"999"}}`),
+				},
+			},
 		},
-		GivenObjects: []client.Object{
-			parent.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
-				}).
-				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-					d.Image(helloImage)
-					d.Interval(metav1.Duration{Duration: 5 * time.Minute})
-				}).
-				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-					d.ObservedGeneration(1)
-					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-						d.Revision(fmt.Sprintf("%s:latest@sha256:%s", helloImage, helloDigest))
-						d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+		"requeue interval": {
+			Request: request,
+			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
+				dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					return ctx, err
+				}
+				if _, err := os.Create(path.Join(dir, helloDigest+".tar.gz")); err != nil {
+					return ctx, err
+				}
+
+				return ctx, nil
+			},
+			GivenObjects: []client.Object{
+				parent.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
+					}).
+					SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+						d.Image(helloImage)
+						d.Interval(metav1.Duration{Duration: 5 * time.Minute})
+					}).
+					StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+						d.ObservedGeneration(1)
+						d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+							d.Revision(fmt.Sprintf("%s:latest@sha256:%s", helloImage, helloDigest))
+							d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+							d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+							d.Checksum(helloChecksum)
+							// use an old timestamp as an indication the resource wasn't updated
+							d.LastUpdateTime(metav1.Time{Time: time.Unix(100, 0)})
+						})
 						d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-						d.Checksum(helloChecksum)
-						// use an old timestamp as an indication the resource wasn't updated
-						d.LastUpdateTime(metav1.Time{Time: time.Unix(100, 0)})
-					})
-					d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-					d.ConditionsDie(
-						diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
-						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
-						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
-					)
-				}),
-			defaultServiceAccount,
+						d.ConditionsDie(
+							diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+							diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+							diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+						)
+					}),
+				defaultServiceAccount,
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+			},
+			ExpectedResult: reconcile.Result{
+				RequeueAfter: 5 * time.Minute,
+			},
 		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+		"image pull error": {
+			Request: request,
+			StatusSubResourceTypes: []client.Object{
+				&sourcev1alpha1.ImageRepository{},
+			},
+			GivenObjects: []client.Object{
+				parent.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
+					}).
+					SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+						d.Image(fmt.Sprintf("%s/this/does/not/exist:latest", registryHost))
+					}),
+				defaultServiceAccount,
+			},
+			ExpectStatusUpdates: []client.Object{
+				parent.
+					SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+						d.Image(fmt.Sprintf("%s/this/does/not/exist:latest", registryHost))
+					}).
+					StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+						d.ObservedGeneration(1)
+						d.ConditionsDie(
+							diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionUnknown).Reason("Initializing"),
+							diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+								Messagef(`Unable to resolve image with tag "%s/this/does/not/exist:latest" to a digest: HEAD https://%s/v2/this/does/not/exist/manifests/latest: unexpected status code 404 Not Found (HEAD responses have no body, use GET for details)`, registryHost, registryHost),
+							diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
+								Messagef(`Unable to resolve image with tag "%s/this/does/not/exist:latest" to a digest: HEAD https://%s/v2/this/does/not/exist/manifests/latest: unexpected status code 404 Not Found (HEAD responses have no body, use GET for details)`, registryHost, registryHost),
+						)
+					}),
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "StatusUpdated", `Updated status`),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+			},
 		},
-		ExpectedResult: reconcile.Result{
-			RequeueAfter: 5 * time.Minute,
-		},
-	}, {
-		Name: "image pull error",
-		Key:  key,
-		GivenObjects: []client.Object{
-			parent.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers("source.apps.tanzu.vmware.com/finalizer")
-				}).
-				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-					d.Image(fmt.Sprintf("%s/this/does/not/exist:latest", registryHost))
-				}),
-			defaultServiceAccount,
-		},
-		ExpectStatusUpdates: []client.Object{
-			parent.
-				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-					d.Image(fmt.Sprintf("%s/this/does/not/exist:latest", registryHost))
-				}).
-				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-					d.ObservedGeneration(1)
-					d.ConditionsDie(
-						diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionUnknown).Reason("Initializing"),
-						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-							Messagef(`Unable to resolve image with tag "%s/this/does/not/exist:latest" to a digest: HEAD https://%s/v2/this/does/not/exist/manifests/latest: unexpected status code 404 Not Found (HEAD responses have no body, use GET for details)`, registryHost, registryHost),
-						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
-							Messagef(`Unable to resolve image with tag "%s/this/does/not/exist:latest" to a digest: HEAD https://%s/v2/this/does/not/exist/manifests/latest: unexpected status code 404 Not Found (HEAD responses have no body, use GET for details)`, registryHost, registryHost),
-					)
-				}),
-		},
-		ExpectEvents: []rtesting.Event{
-			rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "StatusUpdated", `Updated status`),
-		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
-		},
-	}}
+	}
 
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.ReconcilerTestCase, c reconcilers.Config) reconcile.Reconciler {
 		// drop the artifactRootDir between test cases
@@ -356,165 +365,166 @@ func TestImageRepositoryImagePullSecretsSyncReconciler(t *testing.T) {
 			d.Name("pull-secret")
 		})
 
-	rts := rtesting.SubReconcilerTestSuite{{
-		Name:     "default service account",
-		Resource: parent,
-		GivenObjects: []client.Object{
-			defaultServiceAccount.
-				ImagePullSecretsDie(
-					diecorev1.LocalObjectReferenceBlank.Name("pull-secret"),
-				),
-			imagePullSecret,
-		},
-		ExpectResource: parent,
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImagePullSecretsStashKey: []corev1.Secret{
-				imagePullSecret.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.ResourceVersion("999")
-					}).
-					DieRelease(),
+	rts := rtesting.SubReconcilerTests[*sourcev1alpha1.ImageRepository]{
+		"default service account": {
+			Resource: parent.DieReleasePtr(),
+			GivenObjects: []client.Object{
+				defaultServiceAccount.
+					ImagePullSecretsDie(
+						diecorev1.LocalObjectReferenceBlank.Name("pull-secret"),
+					),
+				imagePullSecret,
+			},
+			ExpectResource: parent.DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{
+					imagePullSecret.
+						MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+							d.ResourceVersion("999")
+						}).
+						DieRelease(),
+				},
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+				rtesting.NewTrackRequest(imagePullSecret, parent, scheme),
 			},
 		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
-			rtesting.NewTrackRequest(imagePullSecret, parent, scheme),
-		},
-	}, {
-		Name: "custom service account",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.ServiceAccountName("custom-sa")
-			}),
-		GivenObjects: []client.Object{
-			customServiceAccount.
-				ImagePullSecretsDie(
-					diecorev1.LocalObjectReferenceBlank.Name("pull-secret"),
-				),
-			imagePullSecret,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.ServiceAccountName("custom-sa")
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImagePullSecretsStashKey: []corev1.Secret{
-				imagePullSecret.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.ResourceVersion("999")
-					}).
-					DieRelease(),
+		"custom service account": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.ServiceAccountName("custom-sa")
+				}).DieReleasePtr(),
+			GivenObjects: []client.Object{
+				customServiceAccount.
+					ImagePullSecretsDie(
+						diecorev1.LocalObjectReferenceBlank.Name("pull-secret"),
+					),
+				imagePullSecret,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.ServiceAccountName("custom-sa")
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{
+					imagePullSecret.
+						MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+							d.ResourceVersion("999")
+						}).
+						DieRelease(),
+				},
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(customServiceAccount, parent, scheme),
+				rtesting.NewTrackRequest(imagePullSecret, parent, scheme),
 			},
 		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(customServiceAccount, parent, scheme),
-			rtesting.NewTrackRequest(imagePullSecret, parent, scheme),
-		},
-	}, {
-		Name: "custom image pull secrets",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.ImagePullSecrets(
-					corev1.LocalObjectReference{Name: "pull-secret"},
-				)
-			}),
-		GivenObjects: []client.Object{
-			defaultServiceAccount,
-			imagePullSecret,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.ImagePullSecrets(
-					corev1.LocalObjectReference{Name: "pull-secret"},
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImagePullSecretsStashKey: []corev1.Secret{
-				imagePullSecret.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.ResourceVersion("999")
-					}).
-					DieRelease(),
+		"custom image pull secrets": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.ImagePullSecrets(
+						corev1.LocalObjectReference{Name: "pull-secret"},
+					)
+				}).DieReleasePtr(),
+			GivenObjects: []client.Object{
+				defaultServiceAccount,
+				imagePullSecret,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.ImagePullSecrets(
+						corev1.LocalObjectReference{Name: "pull-secret"},
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{
+					imagePullSecret.
+						MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+							d.ResourceVersion("999")
+						}).
+						DieRelease(),
+				},
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+				rtesting.NewTrackRequest(imagePullSecret, parent, scheme),
 			},
 		},
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
-			rtesting.NewTrackRequest(imagePullSecret, parent, scheme),
+		"service account not found": {
+			Resource:     parent.DieReleasePtr(),
+			GivenObjects: []client.Object{},
+			ExpectResource: parent.
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("ServiceAccountMissing").Message(`ServiceAccount "default" not found in namespace "test-namespace"`),
+						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("ServiceAccountMissing").Message(`ServiceAccount "default" not found in namespace "test-namespace"`),
+					)
+				}).DieReleasePtr(),
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+			},
 		},
-	}, {
-		Name:         "service account not found",
-		Resource:     parent,
-		GivenObjects: []client.Object{},
-		ExpectResource: parent.
-			StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("ServiceAccountMissing").Message(`ServiceAccount "default" not found in namespace "test-namespace"`),
-					diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("ServiceAccountMissing").Message(`ServiceAccount "default" not found in namespace "test-namespace"`),
-				)
-			}),
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+		"error fetching service account": {
+			Resource: parent.DieReleasePtr(),
+			GivenObjects: []client.Object{
+				defaultServiceAccount.
+					ImagePullSecrets(
+						corev1.LocalObjectReference{Name: "pull-secret"},
+					),
+				imagePullSecret,
+			},
+			WithReactors: []rtesting.ReactionFunc{
+				rtesting.InduceFailure("get", "ServiceAccount"),
+			},
+			ShouldErr:      true,
+			ExpectResource: parent.DieReleasePtr(),
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+			},
 		},
-	}, {
-		Name:     "error fetching service account",
-		Resource: parent,
-		GivenObjects: []client.Object{
-			defaultServiceAccount.
-				ImagePullSecrets(
-					corev1.LocalObjectReference{Name: "pull-secret"},
-				),
-			imagePullSecret,
+		"secret not found": {
+			Resource: parent.DieReleasePtr(),
+			GivenObjects: []client.Object{
+				defaultServiceAccount.
+					ImagePullSecrets(
+						corev1.LocalObjectReference{Name: "pull-secret"},
+					),
+			},
+			ExpectResource: parent.
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").Message(`Secret "pull-secret" not found in namespace "test-namespace"`),
+						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").Message(`Secret "pull-secret" not found in namespace "test-namespace"`),
+					)
+				}).DieReleasePtr(),
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+				rtesting.NewTrackRequest(imagePullSecret, parent, scheme),
+			},
 		},
-		WithReactors: []rtesting.ReactionFunc{
-			rtesting.InduceFailure("get", "ServiceAccount"),
+		"error fetching secret": {
+			Resource: parent.DieReleasePtr(),
+			GivenObjects: []client.Object{
+				defaultServiceAccount.
+					ImagePullSecrets(
+						corev1.LocalObjectReference{Name: "pull-secret"},
+					),
+				imagePullSecret,
+			},
+			WithReactors: []rtesting.ReactionFunc{
+				rtesting.InduceFailure("get", "Secret"),
+			},
+			ShouldErr:      true,
+			ExpectResource: parent.DieReleasePtr(),
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
+				rtesting.NewTrackRequest(imagePullSecret, parent, scheme),
+			},
 		},
-		ShouldErr:      true,
-		ExpectResource: parent,
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
-		},
-	}, {
-		Name:     "secret not found",
-		Resource: parent,
-		GivenObjects: []client.Object{
-			defaultServiceAccount.
-				ImagePullSecrets(
-					corev1.LocalObjectReference{Name: "pull-secret"},
-				),
-		},
-		ExpectResource: parent.
-			StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").Message(`Secret "pull-secret" not found in namespace "test-namespace"`),
-					diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("SecretMissing").Message(`Secret "pull-secret" not found in namespace "test-namespace"`),
-				)
-			}),
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
-			rtesting.NewTrackRequest(imagePullSecret, parent, scheme),
-		},
-	}, {
-		Name:     "error fetching secret",
-		Resource: parent,
-		GivenObjects: []client.Object{
-			defaultServiceAccount.
-				ImagePullSecrets(
-					corev1.LocalObjectReference{Name: "pull-secret"},
-				),
-			imagePullSecret,
-		},
-		WithReactors: []rtesting.ReactionFunc{
-			rtesting.InduceFailure("get", "Secret"),
-		},
-		ShouldErr:      true,
-		ExpectResource: parent,
-		ExpectTracks: []rtesting.TrackRequest{
-			rtesting.NewTrackRequest(defaultServiceAccount, parent, scheme),
-			rtesting.NewTrackRequest(imagePullSecret, parent, scheme),
-		},
-	}}
+	}
 
-	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase, c reconcilers.Config) reconcilers.SubReconciler {
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.ImageRepository], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.ImageRepository] {
 		return controllers.ImageRepositoryImagePullSecretsSyncReconciler()
 	})
 }
@@ -550,105 +560,105 @@ func TestImageRepositoryImageDigestSyncReconciler(t *testing.T) {
 			d.ObservedGeneration(1)
 		})
 
-	rts := rtesting.SubReconcilerTestSuite{{
-		Name: "propagate digested images",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(digestedImage)
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+	rts := rtesting.SubReconcilerTests[*sourcev1alpha1.ImageRepository]{
+		"propagate digested images": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(digestedImage)
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(digestedImage)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey: digestedImage,
+			},
 		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(digestedImage)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey: digestedImage,
+		"resolve tagged image": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(taggedImage)
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{},
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(taggedImage)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey: taggedImageDigest,
+			},
 		},
-	}, {
-		Name: "resolve tagged image",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(taggedImage)
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImagePullSecretsStashKey: []corev1.Secret{},
-			controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+		"skip when pull secrets are missing": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(taggedImage)
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImagePullSecretsStashKey: nil,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(taggedImage)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey: nil,
+			},
 		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(taggedImage)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey: taggedImageDigest,
+		"malformed repository": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(registryHost + "/a")
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{},
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(registryHost + "/a")
+				}).
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("MalformedRepository").Message(`Image name "`+registryHost+`/a" failed validation: repository must be between 2 and 255 characters in length: a`),
+						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("MalformedRepository").Message(`Image name "`+registryHost+`/a" failed validation: repository must be between 2 and 255 characters in length: a`),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey: nil,
+			},
 		},
-	}, {
-		Name: "skip when pull secrets are missing",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(taggedImage)
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImagePullSecretsStashKey: nil,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(taggedImage)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey: nil,
-		},
-	}, {
-		Name: "malformed repository",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(registryHost + "/a")
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImagePullSecretsStashKey: []corev1.Secret{},
-			controllers.HttpRoundTripperStashKey: registry.Client().Transport,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(registryHost + "/a")
-			}).
-			StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-				d.ConditionsDie(
-					diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("MalformedRepository").Message(`Image name "`+registryHost+`/a" failed validation: repository must be between 2 and 255 characters in length: a`),
-					diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("MalformedRepository").Message(`Image name "`+registryHost+`/a" failed validation: repository must be between 2 and 255 characters in length: a`),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey: nil,
-		},
-	}, {
-		Name: "remote error",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(registryHost + "/missing")
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImagePullSecretsStashKey: []corev1.Secret{},
-			controllers.HttpRoundTripperStashKey: registry.Client().Transport,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(registryHost + "/missing")
-			}).
-			StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-				d.ConditionsDie(
-					// TODO(scothis) can we better handle a forbidden or not found error?
-					diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").Message(`Unable to resolve image with tag "`+registryHost+`/missing" to a digest: HEAD https://`+registryHost+`/v2/missing/manifests/latest: unexpected status code 404 Not Found (HEAD responses have no body, use GET for details)`),
-					diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").Message(`Unable to resolve image with tag "`+registryHost+`/missing" to a digest: HEAD https://`+registryHost+`/v2/missing/manifests/latest: unexpected status code 404 Not Found (HEAD responses have no body, use GET for details)`),
-				)
-			}),
-		ExpectStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey: nil,
-		},
-	}}
+		"remote error": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(registryHost + "/missing")
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{},
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(registryHost + "/missing")
+				}).
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ConditionsDie(
+						// TODO(scothis) can we better handle a forbidden or not found error?
+						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("RemoteError").Message(`Unable to resolve image with tag "`+registryHost+`/missing" to a digest: HEAD https://`+registryHost+`/v2/missing/manifests/latest: unexpected status code 404 Not Found (HEAD responses have no body, use GET for details)`),
+						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").Message(`Unable to resolve image with tag "`+registryHost+`/missing" to a digest: HEAD https://`+registryHost+`/v2/missing/manifests/latest: unexpected status code 404 Not Found (HEAD responses have no body, use GET for details)`),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey: nil,
+			},
+		}}
 
-	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase, c reconcilers.Config) reconcilers.SubReconciler {
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.ImageRepository], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.ImageRepository] {
 		return controllers.ImageRepositoryImageDigestSyncReconciler()
 	})
 }
@@ -671,7 +681,7 @@ func TestImageRepositoryPullImageSyncReconciler(t *testing.T) {
 	helloChecksum := "00a04fda65d6d2c7924a2729b8369efbe3f4e978"
 	image := fmt.Sprintf("%s@sha256:%s", helloImage, helloDigest)
 
-	artifactRootDir, err := ioutil.TempDir(os.TempDir(), "artifacts.*")
+	artifactRootDir, err := os.MkdirTemp(os.TempDir(), "artifacts.*")
 	utilruntime.Must(err)
 	defer os.RemoveAll(artifactRootDir)
 
@@ -691,182 +701,182 @@ func TestImageRepositoryPullImageSyncReconciler(t *testing.T) {
 			d.ObservedGeneration(1)
 		})
 
-	rts := rtesting.SubReconcilerTestSuite{{
-		Name: "pull image",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey:         image,
-			controllers.ImagePullSecretsStashKey: []corev1.Secret{},
-			controllers.HttpRoundTripperStashKey: registry.Client().Transport,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-			}).
-			StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-				d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-					d.Revision(image)
-					d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+	rts := rtesting.SubReconcilerTests[*sourcev1alpha1.ImageRepository]{
+		"pull image": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey:         image,
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{},
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+				}).
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+						d.Revision(image)
+						d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.Checksum(helloChecksum)
+						d.LastUpdateTime(now())
+					})
 					d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-					d.Checksum(helloChecksum)
-					d.LastUpdateTime(now())
-				})
-				d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-				d.ConditionsDie(
-					diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
-					diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
-					diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
-				)
-			}),
-		CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase) error {
-			// check that the file exists
-			artifact := path.Join(artifactRootDir, "imagerepository", namespace, name, helloDigest+".tar.gz")
-			if _, err := os.Stat(artifact); err != nil {
-				t.Errorf("artifact expected to exist %q", artifact)
-			}
-			return nil
+					d.ConditionsDie(
+						diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+					)
+				}).DieReleasePtr(),
+			CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.ImageRepository]) error {
+				// check that the file exists
+				artifact := path.Join(artifactRootDir, "imagerepository", namespace, name, helloDigest+".tar.gz")
+				if _, err := os.Stat(artifact); err != nil {
+					t.Errorf("artifact expected to exist %q", artifact)
+				}
+				return nil
+			},
 		},
-	}, {
-		Name: "skip existing image",
-		Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase) (context.Context, error) {
-			dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return ctx, err
-			}
-			if _, err := os.Create(path.Join(dir, helloDigest+".tar.gz")); err != nil {
-				return ctx, err
-			}
+		"skip existing image": {
+			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.ImageRepository]) (context.Context, error) {
+				dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					return ctx, err
+				}
+				if _, err := os.Create(path.Join(dir, helloDigest+".tar.gz")); err != nil {
+					return ctx, err
+				}
 
-			return ctx, nil
-		},
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-			}).
-			StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-				d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-					d.Revision(image)
-					d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+				return ctx, nil
+			},
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+				}).
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+						d.Revision(image)
+						d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.Checksum(helloChecksum)
+						// use an old timestamp as an indication the resource wasn't updated
+						d.LastUpdateTime(metav1.Time{Time: time.Unix(100, 0)})
+					})
 					d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-					d.Checksum(helloChecksum)
-					// use an old timestamp as an indication the resource wasn't updated
-					d.LastUpdateTime(metav1.Time{Time: time.Unix(100, 0)})
-				})
-				d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey:         image,
-			controllers.ImagePullSecretsStashKey: []corev1.Secret{},
-			controllers.HttpRoundTripperStashKey: registry.Client().Transport,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-			}).
-			StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-				d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-					d.Revision(image)
-					d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey:         image,
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{},
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+				}).
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+						d.Revision(image)
+						d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.Checksum(helloChecksum)
+						// use an old timestamp as an indication the resource wasn't updated
+						d.LastUpdateTime(metav1.Time{Time: time.Unix(100, 0)})
+					})
 					d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-					d.Checksum(helloChecksum)
-					// use an old timestamp as an indication the resource wasn't updated
-					d.LastUpdateTime(metav1.Time{Time: time.Unix(100, 0)})
-				})
-				d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-				d.ConditionsDie(
-					diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
-					diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
-					diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
-				)
-			}),
-	}, {
-		Name: "update if host changes",
-		Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase) (context.Context, error) {
-			dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return ctx, err
-			}
-			if _, err := os.Create(path.Join(dir, helloDigest+".tar.gz")); err != nil {
-				return ctx, err
-			}
+					d.ConditionsDie(
+						diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+					)
+				}).DieReleasePtr(),
+		},
+		"update if host changes": {
+			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.ImageRepository]) (context.Context, error) {
+				dir := path.Join(artifactRootDir, "imagerepository", namespace, name)
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					return ctx, err
+				}
+				if _, err := os.Create(path.Join(dir, helloDigest+".tar.gz")); err != nil {
+					return ctx, err
+				}
 
-			return ctx, nil
-		},
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-			}).
-			StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-				d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-					d.Revision(image)
-					d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-					d.URL("http://localhost/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-					d.Checksum(helloChecksum)
-					// use an old timestamp as an indication the resource wasn't updated
-					d.LastUpdateTime(metav1.Time{Time: time.Unix(100, 0)})
-				})
-				d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey:         image,
-			controllers.ImagePullSecretsStashKey: []corev1.Secret{},
-			controllers.HttpRoundTripperStashKey: registry.Client().Transport,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-			}).
-			StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-				d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-					d.Revision(image)
-					d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+				return ctx, nil
+			},
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+				}).
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+						d.Revision(image)
+						d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.URL("http://localhost/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.Checksum(helloChecksum)
+						// use an old timestamp as an indication the resource wasn't updated
+						d.LastUpdateTime(metav1.Time{Time: time.Unix(100, 0)})
+					})
 					d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-					d.Checksum(helloChecksum)
-					d.LastUpdateTime(now())
-				})
-				d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-				d.ConditionsDie(
-					diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
-					diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
-					diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
-				)
-			}),
-	}, {
-		Name: "missing image",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey:         nil,
-			controllers.ImagePullSecretsStashKey: []corev1.Secret{},
-			controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey:         image,
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{},
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+				}).
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+						d.Revision(image)
+						d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.Checksum(helloChecksum)
+						d.LastUpdateTime(now())
+					})
+					d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+					d.ConditionsDie(
+						diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+					)
+				}).DieReleasePtr(),
 		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-			}),
-	}, {
-		Name: "missing pull secrets",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey:         image,
-			controllers.ImagePullSecretsStashKey: nil,
-			controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+		"missing image": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey:         nil,
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{},
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+				}).DieReleasePtr(),
 		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-			}),
-	}}
+		"missing pull secrets": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey:         image,
+				controllers.ImagePullSecretsStashKey: nil,
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+				}).DieReleasePtr(),
+		}}
 
-	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase, c reconcilers.Config) reconcilers.SubReconciler {
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.ImageRepository], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.ImageRepository] {
 		// drop the artifactRootDir between test cases
 		err := os.RemoveAll(artifactRootDir)
 		utilruntime.Must(err)
@@ -913,7 +923,7 @@ func TestImageRepositoryPullImageSyncReconcilerWithAuth(t *testing.T) {
 	}
 	pullsecrets = append(pullsecrets, secret)
 
-	artifactRootDir, err := ioutil.TempDir(os.TempDir(), "artifacts.*")
+	artifactRootDir, err := os.MkdirTemp(os.TempDir(), "artifacts.*")
 	utilruntime.Must(err)
 	defer os.RemoveAll(artifactRootDir)
 
@@ -933,49 +943,49 @@ func TestImageRepositoryPullImageSyncReconcilerWithAuth(t *testing.T) {
 			d.ObservedGeneration(1)
 		})
 
-	rts := rtesting.SubReconcilerTestSuite{{
-		Name: "pull image from authenticated repository",
-		Resource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-				d.ImagePullSecrets(secretRef...)
-			}),
-		GivenStashedValues: map[reconcilers.StashKey]interface{}{
-			controllers.ImageRefStashKey:         image,
-			controllers.ImagePullSecretsStashKey: pullsecrets,
-			controllers.HttpRoundTripperStashKey: registry.Client().Transport,
-		},
-		ExpectResource: parent.
-			SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
-				d.Image(image)
-				d.ImagePullSecrets(secretRef...)
-			}).
-			StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
-				d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
-					d.Revision(image)
-					d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+	rts := rtesting.SubReconcilerTests[*sourcev1alpha1.ImageRepository]{
+		"pull image from authenticated repository": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+					d.ImagePullSecrets(secretRef...)
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey:         image,
+				controllers.ImagePullSecretsStashKey: pullsecrets,
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(image)
+					d.ImagePullSecrets(secretRef...)
+				}).
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+						d.Revision(image)
+						d.Path("imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
+						d.Checksum(helloChecksum)
+						d.LastUpdateTime(now())
+					})
 					d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-					d.Checksum(helloChecksum)
-					d.LastUpdateTime(now())
-				})
-				d.URL("http://artifact.example/imagerepository/test-namespace/my-image/" + helloDigest + ".tar.gz")
-				d.ConditionsDie(
-					diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
-					diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
-					diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
-				)
-			}),
-		CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase) error {
-			// check that the file exists
-			artifact := path.Join(artifactRootDir, "imagerepository", namespace, name, helloDigest+".tar.gz")
-			if _, err := os.Stat(artifact); err != nil {
-				t.Errorf("artifact expected to exist %q", artifact)
-			}
-			return nil
-		},
-	}}
+					d.ConditionsDie(
+						diesourcev1alpha1.ImageRepositoryConditionArtifactAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+					)
+				}).DieReleasePtr(),
+			CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.ImageRepository]) error {
+				// check that the file exists
+				artifact := path.Join(artifactRootDir, "imagerepository", namespace, name, helloDigest+".tar.gz")
+				if _, err := os.Stat(artifact); err != nil {
+					t.Errorf("artifact expected to exist %q", artifact)
+				}
+				return nil
+			},
+		}}
 
-	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase, c reconcilers.Config) reconcilers.SubReconciler {
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.ImageRepository], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.ImageRepository] {
 		// drop the artifactRootDir between test cases
 		err := os.RemoveAll(artifactRootDir)
 		utilruntime.Must(err)

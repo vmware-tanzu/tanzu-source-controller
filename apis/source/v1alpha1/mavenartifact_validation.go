@@ -21,95 +21,95 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/vmware-labs/reconciler-runtime/validation"
-	kvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/api/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // +kubebuilder:webhook:path=/validate-source-apps-tanzu-vmware-com-v1alpha1-mavenartifact,mutating=false,failurePolicy=fail,sideEffects=none,admissionReviewVersions=v1beta1,groups=source.apps.tanzu.vmware.com,resources=mavenartifacts,verbs=create;update,versions=v1alpha1,name=mavenartifacts.source.apps.tanzu.vmware.com
 
-var (
-	_ webhook.Validator         = &MavenArtifact{}
-	_ validation.FieldValidator = &MavenArtifact{}
-)
+var _ webhook.Validator = &MavenArtifact{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *MavenArtifact) ValidateCreate() error {
-	return r.Validate().ToAggregate()
+func (r *MavenArtifact) ValidateCreate() (admission.Warnings, error) {
+	return nil, r.validate().ToAggregate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (c *MavenArtifact) ValidateUpdate(old runtime.Object) error {
+func (c *MavenArtifact) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	// TODO check for immutable fields
-	return c.Validate().ToAggregate()
+	return nil, c.validate().ToAggregate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (c *MavenArtifact) ValidateDelete() error {
-	return nil
+func (c *MavenArtifact) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
-func (r *MavenArtifact) Validate() validation.FieldErrors {
-	errs := validation.FieldErrors{}
-	return errs.Also(r.Spec.Validate().ViaField("spec"))
+func (r *MavenArtifact) validate() field.ErrorList {
+	errs := field.ErrorList{}
+
+	errs = append(errs, r.Spec.validate(field.NewPath("spec"))...)
+
+	return errs
 }
 
-func (s *MavenArtifactSpec) Validate() validation.FieldErrors {
-	errs := validation.FieldErrors{}
+func (s *MavenArtifactSpec) validate(fldPath *field.Path) field.ErrorList {
+	errs := field.ErrorList{}
 
-	errs = errs.Also(s.Artifact.Validate().ViaField("artifact"))
-	errs = errs.Also(s.Repository.Validate().ViaField("repository"))
+	errs = append(errs, s.Artifact.validate(fldPath.Child("artifact"))...)
+	errs = append(errs, s.Repository.validate(fldPath.Child("repository"))...)
 
 	if s.Interval.Duration <= 0 {
-		errs = errs.Also(validation.ErrInvalidValue(s.Interval, "interval"))
+		errs = append(errs, field.Invalid(fldPath.Child("interval"), s.Interval, ""))
 	}
 	if s.Timeout != nil && s.Timeout.Duration <= 0 {
-		errs = errs.Also(validation.ErrInvalidValue(s.Timeout, "timeout"))
+		errs = append(errs, field.Invalid(fldPath.Child("timeout"), s.Timeout, ""))
 	}
 
 	return errs
 }
 
-func (s *MavenArtifactType) Validate() validation.FieldErrors {
-	errs := validation.FieldErrors{}
+func (s *MavenArtifactType) validate(fldPath *field.Path) field.ErrorList {
+	errs := field.ErrorList{}
 
 	if s.GroupId == "" {
-		errs = errs.Also(validation.ErrMissingField("groupId"))
+		errs = append(errs, field.Required(fldPath.Child("groupId"), ""))
 	}
 	if s.ArtifactId == "" {
-		errs = errs.Also(validation.ErrMissingField("artifactId"))
+		errs = append(errs, field.Required(fldPath.Child("artifactId"), ""))
 	}
 
 	if s.Version == "" {
-		errs = errs.Also(validation.ErrMissingField("version"))
+		errs = append(errs, field.Required(fldPath.Child("version"), ""))
 	} else if strings.HasPrefix(s.Version, "[") ||
 		strings.HasPrefix(s.Version, "(") {
 		// TODO remove this validation rule when version range is resolvable
-		errs = errs.Also(validation.ErrInvalidValue(s.Version, "version"))
+		errs = append(errs, field.Invalid(fldPath.Child("version"), s.Version, ""))
 	}
 
 	return errs
 }
 
-func (s *Repository) Validate() validation.FieldErrors {
-	errs := validation.FieldErrors{}
+func (s *Repository) validate(fldPath *field.Path) field.ErrorList {
+	errs := field.ErrorList{}
 
 	if s.URL == "" {
-		errs = errs.Also(validation.ErrMissingField("url"))
+		errs = append(errs, field.Required(fldPath.Child("url"), ""))
 	} else if u, err := url.Parse(s.URL); err != nil {
-		errs = errs.Also(validation.ErrInvalidValue(s.URL, "url"))
+		errs = append(errs, field.Invalid(fldPath.Child("url"), s.URL, ""))
 	} else {
 		if u.Scheme != "https" {
-			errs = append(errs, field.Invalid(field.NewPath("url"), s.URL, fmt.Sprintf(`Scheme "https" is required; scheme %q is not allowed in repository URL %q`, u.Scheme, s.URL)))
+			errs = append(errs, field.Invalid(fldPath.Child("url"), s.URL, fmt.Sprintf(`Scheme "https" is required; scheme %q is not allowed in repository URL %q`, u.Scheme, s.URL)))
 		}
 	}
 
 	if n := s.SecretRef.Name; n != "" {
-		if out := kvalidation.NameIsDNSLabel(n, false); len(out) != 0 {
-			errs = errs.Also(validation.ErrInvalidValue(s.SecretRef.Name, "secretRef.name"))
+		if out := validation.NameIsDNSLabel(n, false); len(out) != 0 {
+			errs = append(errs, field.Invalid(fldPath.Child("secretRef", "name"), s.SecretRef.Name, ""))
 		}
 	}
 
