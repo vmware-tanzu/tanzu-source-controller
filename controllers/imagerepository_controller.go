@@ -31,7 +31,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/google/go-containerregistry/pkg/authn/kubernetes"
+	"github.com/google/go-containerregistry/pkg/authn/k8schain"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/vmware-labs/reconciler-runtime/apis"
@@ -167,7 +167,7 @@ func ImageRepositoryImageDigestSyncReconciler() reconcilers.SubReconciler[*sourc
 			if pullSecrets == nil {
 				return nil
 			}
-			keychain, err := kubernetes.NewFromPullSecrets(ctx, pullSecrets)
+			keychain, err := k8schain.NewFromPullSecrets(ctx, pullSecrets)
 			if err != nil {
 				return err
 			}
@@ -240,7 +240,7 @@ func ImageRepositoryPullImageSyncReconciler(httpRootDir, httpHost string, now fu
 			if pullSecrets == nil {
 				return nil
 			}
-			keychain, err := kubernetes.NewFromPullSecrets(ctx, pullSecrets)
+			keychain, err := k8schain.NewFromPullSecrets(ctx, pullSecrets)
 			if err != nil {
 				return err
 			}
