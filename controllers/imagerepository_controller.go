@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -46,8 +45,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	sourcev1alpha1 "github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1"
 )
@@ -58,12 +55,11 @@ import (
 //+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 
 // ImageRepositoryReconciler reconciles a ImageRepository object
-func ImageRepositoryReconciler(c reconcilers.Config, httpRootDir, httpHost string, now func() metav1.Time, certs []Cert) *reconcilers.ParentReconciler {
-	return &reconcilers.ParentReconciler{
-		Type: &sourcev1alpha1.ImageRepository{},
-		Reconciler: &reconcilers.WithFinalizer{
+func ImageRepositoryReconciler(c reconcilers.Config, httpRootDir, httpHost string, now func() metav1.Time, certs []Cert) *reconcilers.ResourceReconciler[*sourcev1alpha1.ImageRepository] {
+	return &reconcilers.ResourceReconciler[*sourcev1alpha1.ImageRepository]{
+		Reconciler: &reconcilers.WithFinalizer[*sourcev1alpha1.ImageRepository]{
 			Finalizer: sourcev1alpha1.Group + "/finalizer",
-			Reconciler: reconcilers.Sequence{
+			Reconciler: reconcilers.Sequence[*sourcev1alpha1.ImageRepository]{
 				ImageRepositoryTransportSyncReconciler(certs),
 				ImageRepositoryImagePullSecretsSyncReconciler(),
 				ImageRepositoryImageDigestSyncReconciler(),
@@ -76,10 +72,10 @@ func ImageRepositoryReconciler(c reconcilers.Config, httpRootDir, httpHost strin
 	}
 }
 
-func ImageRepositoryTransportSyncReconciler(certs []Cert) reconcilers.SubReconciler {
-	return &reconcilers.SyncReconciler{
+func ImageRepositoryTransportSyncReconciler(certs []Cert) reconcilers.SubReconciler[*sourcev1alpha1.ImageRepository] {
+	return &reconcilers.SyncReconciler[*sourcev1alpha1.ImageRepository]{
 		Name: "ImageRepositoryTransportSyncReconciler",
-		Sync: func(ctx context.Context, _ client.Object) error {
+		Sync: func(ctx context.Context, _ *sourcev1alpha1.ImageRepository) error {
 			transport, err := newTransport(ctx, certs)
 			if err != nil {
 				return err
@@ -93,8 +89,8 @@ func ImageRepositoryTransportSyncReconciler(certs []Cert) reconcilers.SubReconci
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch
 
-func ImageRepositoryImagePullSecretsSyncReconciler() reconcilers.SubReconciler {
-	return &reconcilers.SyncReconciler{
+func ImageRepositoryImagePullSecretsSyncReconciler() reconcilers.SubReconciler[*sourcev1alpha1.ImageRepository] {
+	return &reconcilers.SyncReconciler[*sourcev1alpha1.ImageRepository]{
 		Name: "ImageRepositoryImagePullSecretsSyncReconciler",
 		Sync: func(ctx context.Context, parent *sourcev1alpha1.ImageRepository) error {
 			c := reconcilers.RetrieveConfigOrDie(ctx)
@@ -144,17 +140,17 @@ func ImageRepositoryImagePullSecretsSyncReconciler() reconcilers.SubReconciler {
 
 		Setup: func(ctx context.Context, mgr controllerruntime.Manager, bldr *builder.Builder) error {
 			// register an informer to watch Secret's metadata only. This reduces the cache size in memory.
-			bldr.Watches(&source.Kind{Type: &corev1.Secret{}}, reconcilers.EnqueueTracked(ctx, &corev1.Secret{}), builder.OnlyMetadata)
+			bldr.Watches(&corev1.Secret{}, reconcilers.EnqueueTracked(ctx), builder.OnlyMetadata)
 			// register an informer to watch ServiceAccounts
-			bldr.Watches(&source.Kind{Type: &corev1.ServiceAccount{}}, reconcilers.EnqueueTracked(ctx, &corev1.ServiceAccount{}))
+			bldr.Watches(&corev1.ServiceAccount{}, reconcilers.EnqueueTracked(ctx))
 
 			return nil
 		},
 	}
 }
 
-func ImageRepositoryImageDigestSyncReconciler() reconcilers.SubReconciler {
-	return &reconcilers.SyncReconciler{
+func ImageRepositoryImageDigestSyncReconciler() reconcilers.SubReconciler[*sourcev1alpha1.ImageRepository] {
+	return &reconcilers.SyncReconciler[*sourcev1alpha1.ImageRepository]{
 		Name: "ImageRepositoryImageDigestSyncReconciler",
 		Sync: func(ctx context.Context, parent *sourcev1alpha1.ImageRepository) error {
 			log := logr.FromContextOrDiscard(ctx)
@@ -195,8 +191,8 @@ func ImageRepositoryImageDigestSyncReconciler() reconcilers.SubReconciler {
 	}
 }
 
-func ImageRepositoryPullImageSyncReconciler(httpRootDir, httpHost string, now func() metav1.Time) reconcilers.SubReconciler {
-	return &reconcilers.SyncReconciler{
+func ImageRepositoryPullImageSyncReconciler(httpRootDir, httpHost string, now func() metav1.Time) reconcilers.SubReconciler[*sourcev1alpha1.ImageRepository] {
+	return &reconcilers.SyncReconciler[*sourcev1alpha1.ImageRepository]{
 		Name: "ImageRepositoryPullImageSyncReconciler",
 		Finalize: func(ctx context.Context, parent *sourcev1alpha1.ImageRepository) error {
 			log := logr.FromContextOrDiscard(ctx)
@@ -229,7 +225,7 @@ func ImageRepositoryPullImageSyncReconciler(httpRootDir, httpHost string, now fu
 			}
 
 			// pull image
-			dir, err := ioutil.TempDir(os.TempDir(), "image.*")
+			dir, err := os.MkdirTemp(os.TempDir(), "image.*")
 			if err != nil {
 				return err
 			}
@@ -302,10 +298,10 @@ func ImageRepositoryPullImageSyncReconciler(httpRootDir, httpHost string, now fu
 	}
 }
 
-func ImageRepositoryIntervalReconciler() reconcilers.SubReconciler {
-	return &reconcilers.SyncReconciler{
+func ImageRepositoryIntervalReconciler() reconcilers.SubReconciler[*sourcev1alpha1.ImageRepository] {
+	return &reconcilers.SyncReconciler[*sourcev1alpha1.ImageRepository]{
 		Name: "ImageRepositoryIntervalReconciler",
-		Sync: func(ctx context.Context, parent *sourcev1alpha1.ImageRepository) (controllerruntime.Result, error) {
+		SyncWithResult: func(ctx context.Context, parent *sourcev1alpha1.ImageRepository) (controllerruntime.Result, error) {
 			return controllerruntime.Result{RequeueAfter: parent.Spec.Interval.Duration}, nil
 		},
 	}

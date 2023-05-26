@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/vmware-labs/reconciler-runtime/validation"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -107,12 +106,12 @@ func TestMavenArtifactValidate(t *testing.T) {
 	tests := []struct {
 		name     string
 		seed     *MavenArtifact
-		expected validation.FieldErrors
+		expected field.ErrorList
 	}{
 		{
 			name: "empty is not valid",
 			seed: &MavenArtifact{},
-			expected: validation.FieldErrors{
+			expected: field.ErrorList{
 				field.Required(field.NewPath("spec", "artifact", "groupId"), ""),
 				field.Required(field.NewPath("spec", "artifact", "artifactId"), ""),
 				field.Required(field.NewPath("spec", "artifact", "version"), ""),
@@ -135,7 +134,7 @@ func TestMavenArtifactValidate(t *testing.T) {
 					Interval: metav1.Duration{Duration: time.Minute},
 				},
 			},
-			expected: validation.FieldErrors{},
+			expected: field.ErrorList{},
 		},
 		{
 			name: "fully valid",
@@ -158,7 +157,7 @@ func TestMavenArtifactValidate(t *testing.T) {
 					Timeout:  &metav1.Duration{Duration: time.Minute},
 				},
 			},
-			expected: validation.FieldErrors{},
+			expected: field.ErrorList{},
 		},
 		{
 			name: "invalid version LATEST",
@@ -175,7 +174,7 @@ func TestMavenArtifactValidate(t *testing.T) {
 					Interval: metav1.Duration{Duration: time.Minute},
 				},
 			},
-			expected: validation.FieldErrors{},
+			expected: field.ErrorList{},
 		},
 		{
 			name: "valid version SNAPSHOT",
@@ -192,7 +191,7 @@ func TestMavenArtifactValidate(t *testing.T) {
 					Interval: metav1.Duration{Duration: time.Minute},
 				},
 			},
-			expected: validation.FieldErrors{},
+			expected: field.ErrorList{},
 		},
 		{
 			// TODO this is valid, but not presently supported
@@ -210,7 +209,7 @@ func TestMavenArtifactValidate(t *testing.T) {
 					Interval: metav1.Duration{Duration: time.Minute},
 				},
 			},
-			expected: validation.FieldErrors{
+			expected: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "artifact", "version"), "[1.0,2.0)", ""),
 			},
 		},
@@ -229,7 +228,7 @@ func TestMavenArtifactValidate(t *testing.T) {
 					Interval: metav1.Duration{Duration: time.Minute},
 				},
 			},
-			expected: validation.FieldErrors{
+			expected: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "repository", "url"), "https://repo1.maven.org:badport/maven2", ""),
 			},
 		},
@@ -248,7 +247,7 @@ func TestMavenArtifactValidate(t *testing.T) {
 					Interval: metav1.Duration{Duration: time.Minute},
 				},
 			},
-			expected: validation.FieldErrors{
+			expected: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "repository", "url"), "http://repo1.maven.org/maven2", `Scheme "https" is required; scheme "http" is not allowed in repository URL "http://repo1.maven.org/maven2"`),
 			},
 		},
@@ -270,7 +269,7 @@ func TestMavenArtifactValidate(t *testing.T) {
 					Interval: metav1.Duration{Duration: time.Minute},
 				},
 			},
-			expected: validation.FieldErrors{
+			expected: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "repository", "secretRef", "name"), "-", ""),
 			},
 		},
@@ -289,7 +288,7 @@ func TestMavenArtifactValidate(t *testing.T) {
 					Interval: metav1.Duration{Duration: 0},
 				},
 			},
-			expected: validation.FieldErrors{
+			expected: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "interval"), metav1.Duration{}, ""),
 			},
 		},
@@ -309,7 +308,7 @@ func TestMavenArtifactValidate(t *testing.T) {
 					Timeout:  &metav1.Duration{Duration: 0},
 				},
 			},
-			expected: validation.FieldErrors{
+			expected: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "timeout"), &metav1.Duration{}, ""),
 			},
 		},
@@ -317,18 +316,24 @@ func TestMavenArtifactValidate(t *testing.T) {
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
-			if diff := cmp.Diff(c.expected, c.seed.Validate()); diff != "" {
+			if diff := cmp.Diff(c.expected, c.seed.validate()); diff != "" {
 				t.Errorf("validate (-expected, +actual): %s", diff)
 			}
 
 			expectedErr := c.expected.ToAggregate()
-			if diff := cmp.Diff(expectedErr, c.seed.ValidateCreate()); diff != "" {
+
+			_, actualCreateErr := c.seed.ValidateCreate()
+			if diff := cmp.Diff(expectedErr, actualCreateErr); diff != "" {
 				t.Errorf("ValidateCreate (-expected, +actual): %s", diff)
 			}
-			if diff := cmp.Diff(expectedErr, c.seed.ValidateUpdate(c.seed.DeepCopy())); diff != "" {
+
+			_, actualUpdateErr := c.seed.ValidateUpdate(c.seed.DeepCopy())
+			if diff := cmp.Diff(expectedErr, actualUpdateErr); diff != "" {
 				t.Errorf("ValidateCreate (-expected, +actual): %s", diff)
 			}
-			if diff := cmp.Diff(nil, c.seed.ValidateDelete()); diff != "" {
+
+			_, actualDeleteErr := c.seed.ValidateDelete()
+			if diff := cmp.Diff(nil, actualDeleteErr); diff != "" {
 				t.Errorf("ValidateDelete (-expected, +actual): %s", diff)
 			}
 		})
