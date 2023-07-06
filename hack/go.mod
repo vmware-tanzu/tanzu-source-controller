@@ -8,7 +8,7 @@ require (
 	github.com/google/ko v0.14.1
 	github.com/vmware-tanzu/carvel-kapp v0.57.1
 	github.com/vmware-tanzu/carvel-ytt v0.45.3
-	golang.org/x/tools v0.10.0
+	golang.org/x/tools v0.11.0
 	sigs.k8s.io/controller-tools v0.12.0
 	sigs.k8s.io/kustomize/kustomize/v4 v4.5.7
 )
@@ -150,14 +150,14 @@ require (
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
 	go.uber.org/automaxprocs v1.5.2 // indirect
-	golang.org/x/crypto v0.10.0 // indirect
-	golang.org/x/mod v0.11.0 // indirect
-	golang.org/x/net v0.11.0 // indirect
+	golang.org/x/crypto v0.11.0 // indirect
+	golang.org/x/mod v0.12.0 // indirect
+	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/term v0.9.0 // indirect
-	golang.org/x/text v0.10.0 // indirect
+	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/term v0.10.0 // indirect
+	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
