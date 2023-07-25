@@ -68,7 +68,11 @@ vet: ## Run go vet against code.
 
 .PHONY: scan-terms
 scan-terms: ## Scan for inclusive terminology
-	@$(WOKE) . -c https://via.vmw.com/its-woke-rules --exit-1-on-failure
+	@$(WOKE) . -c its-woke-rules.yaml --exit-1-on-failure
+
+.PHONY: woke-rules 
+woke-rules: # Downloads woke rules from https://via.vmw.com/its-woke-rules
+	curl -L https://via.vmw.com/its-woke-rules -o its-woke-rules.yaml
 
 test: manifests generate fmt vet ## Run tests.
 	go test ./... -coverprofile cover.out

@@ -37,7 +37,7 @@ jobs:
       uses: get-woke/woke-action@v0
       with: 
         fail-on-error: true
-        woke-args: -c https://via.vmw.com/its-woke-rules
+        woke-args: -c its-woke-rules.yaml
 
   stage:
     runs-on: ubuntu-latest
