@@ -6,7 +6,7 @@ require (
 	dies.dev/diegen v0.8.0
 	github.com/get-woke/woke v0.19.0
 	github.com/google/ko v0.14.1
-	github.com/vmware-tanzu/carvel-kapp v0.57.1
+	github.com/vmware-tanzu/carvel-kapp v0.58.0
 	github.com/vmware-tanzu/carvel-ytt v0.45.3
 	golang.org/x/tools v0.11.0
 	sigs.k8s.io/controller-tools v0.12.0
@@ -61,14 +61,13 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
-	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/get-woke/fastwalk v1.0.0 // indirect
 	github.com/get-woke/go-git/v5 v5.4.6 // indirect
-	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
 	github.com/go-git/go-billy/v5 v5.3.1 // indirect
@@ -144,7 +143,7 @@ require (
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/vbatts/tar-split v0.11.3 // indirect
 	github.com/vito/go-interact v1.0.1 // indirect
-	github.com/vmware-tanzu/carvel-kapp-controller v0.45.1 // indirect
+	github.com/vmware-tanzu/carvel-kapp-controller v0.46.1 // indirect
 	github.com/vmware-tanzu/carvel-vendir v0.33.1 // indirect
 	github.com/xlab/treeprint v1.1.0 // indirect
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
@@ -170,10 +169,10 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.1.0 // indirect
-	k8s.io/api v0.27.2 // indirect
+	k8s.io/api v0.27.3 // indirect
 	k8s.io/apiextensions-apiserver v0.27.1 // indirect
 	k8s.io/apimachinery v0.27.3 // indirect
-	k8s.io/client-go v0.27.2 // indirect
+	k8s.io/client-go v0.27.3 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 // indirect
