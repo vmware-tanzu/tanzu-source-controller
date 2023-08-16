@@ -7,7 +7,7 @@ require (
 	github.com/get-woke/woke v0.19.0
 	github.com/google/ko v0.14.1
 	github.com/vmware-tanzu/carvel-kapp v0.58.0
-	github.com/vmware-tanzu/carvel-ytt v0.45.3
+	github.com/vmware-tanzu/carvel-ytt v0.45.4
 	golang.org/x/tools v0.12.0
 	sigs.k8s.io/controller-tools v0.12.1
 	sigs.k8s.io/kustomize/kustomize/v4 v4.5.7
