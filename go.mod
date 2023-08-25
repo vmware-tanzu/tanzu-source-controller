@@ -11,9 +11,9 @@ require (
 	github.com/vmware-labs/reconciler-runtime v0.14.0
 	github.com/vmware-tanzu/carvel-imgpkg v0.37.3
 	go.uber.org/zap v1.25.0
-	k8s.io/api v0.28.0
-	k8s.io/apimachinery v0.28.0
-	k8s.io/client-go v0.28.0
+	k8s.io/api v0.28.1
+	k8s.io/apimachinery v0.28.1
+	k8s.io/client-go v0.28.1
 	sigs.k8s.io/controller-runtime v0.16.0
 	sigs.k8s.io/yaml v1.3.0
 )
