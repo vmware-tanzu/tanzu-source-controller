@@ -14,7 +14,7 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/setup-go@v4
       with:
         go-version-file: "go.mod"
@@ -46,7 +46,7 @@ jobs:
       KO_DOCKER_REPO: registry.local/source
       BUNDLE: registry.local/source/bundle
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/setup-go@v4
       with:
         go-version-file: "go.mod"
@@ -169,7 +169,7 @@ jobs:
       REGISTRY_NAME: registry.local
       BUNDLE: registry.local/source/bundle
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/setup-go@v4
       with:
         go-version-file: "go.mod"
