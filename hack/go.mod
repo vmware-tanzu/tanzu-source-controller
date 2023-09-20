@@ -6,7 +6,7 @@ require (
 	dies.dev/diegen v0.9.0
 	github.com/get-woke/woke v0.19.0
 	github.com/google/ko v0.14.1
-	github.com/vmware-tanzu/carvel-kapp v0.58.0
+	github.com/vmware-tanzu/carvel-kapp v0.59.0
 	github.com/vmware-tanzu/carvel-ytt v0.45.4
 	golang.org/x/tools v0.13.0
 	sigs.k8s.io/controller-tools v0.13.0
@@ -141,7 +141,7 @@ require (
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/vbatts/tar-split v0.11.3 // indirect
 	github.com/vito/go-interact v1.0.1 // indirect
-	github.com/vmware-tanzu/carvel-kapp-controller v0.46.1 // indirect
+	github.com/vmware-tanzu/carvel-kapp-controller v0.46.2 // indirect
 	github.com/vmware-tanzu/carvel-vendir v0.33.1 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
@@ -167,10 +167,10 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.1.0 // indirect
-	k8s.io/api v0.28.0 // indirect
+	k8s.io/api v0.28.2 // indirect
 	k8s.io/apiextensions-apiserver v0.28.0 // indirect
-	k8s.io/apimachinery v0.28.0 // indirect
-	k8s.io/client-go v0.28.0 // indirect
+	k8s.io/apimachinery v0.28.2 // indirect
+	k8s.io/client-go v0.28.2 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
