@@ -262,8 +262,8 @@ github.com/vito/go-interact v1.0.1 h1:O8xi8c93bRUv2Tb/v6HdiuGc+WnWt+AQzF74MOOdlB
 github.com/vito/go-interact v1.0.1/go.mod h1:HrdHSJXD2yn1MhlTwSIMeFgQ5WftiIorszVGd3S/DAA=
 github.com/vmware-labs/reconciler-runtime v0.15.0 h1:bALsVuM8rIRozcs+gnpVvf9imUSw36q4tX72jHpQE0s=
 github.com/vmware-labs/reconciler-runtime v0.15.0/go.mod h1:y0JbNaM0BHlH6yBkIyGmOs/VsIZbKbTFzR178zoOowE=
-github.com/vmware-tanzu/carvel-imgpkg v0.37.4 h1:wo6IJIxQgn3YxzUb3aPMuReSHnmRtAQ0075RAKypqfU=
-github.com/vmware-tanzu/carvel-imgpkg v0.37.4/go.mod h1:9ylhupBVCJ4JpYZtZKUzYfeot0EB9oWL90iKZ7eetYA=
+github.com/vmware-tanzu/carvel-imgpkg v0.37.5 h1:jVwlE4y9/jShXusDKsK6WS/0fpa1QeL2KpAAgLPucl8=
+github.com/vmware-tanzu/carvel-imgpkg v0.37.5/go.mod h1:X0WGElm/Eiy42HkAu8I8nPg8wjPrVsfpt7MrTWkh4pQ=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
