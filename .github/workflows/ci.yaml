@@ -50,7 +50,7 @@ jobs:
     - uses: actions/setup-go@v4
       with:
         go-version-file: "go.mod"
-    - uses: carvel-dev/setup-action@v1
+    - uses: carvel-dev/setup-action@v2
       with:
        token: ${{ secrets.GITHUB_TOKEN }}
     - name: Generate certs
@@ -173,7 +173,7 @@ jobs:
     - uses: actions/setup-go@v4
       with:
         go-version-file: "go.mod"
-    - uses: carvel-dev/setup-action@v1
+    - uses: carvel-dev/setup-action@v2
       with:
        token: ${{ secrets.GITHUB_TOKEN }}
     - name: Install kind
