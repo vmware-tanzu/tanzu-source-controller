@@ -5,7 +5,7 @@ go 1.19
 require (
 	dies.dev/diegen v0.9.0
 	github.com/get-woke/woke v0.19.0
-	github.com/google/ko v0.15.0
+	github.com/google/ko v0.15.1
 	github.com/vmware-tanzu/carvel-kapp v0.59.1
 	github.com/vmware-tanzu/carvel-ytt v0.46.2
 	golang.org/x/tools v0.15.0
@@ -172,7 +172,7 @@ require (
 	gotest.tools/v3 v3.1.0 // indirect
 	k8s.io/api v0.28.3 // indirect
 	k8s.io/apiextensions-apiserver v0.28.0 // indirect
-	k8s.io/apimachinery v0.28.3 // indirect
+	k8s.io/apimachinery v0.28.4 // indirect
 	k8s.io/client-go v0.28.3 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
