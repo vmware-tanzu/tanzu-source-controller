@@ -22,7 +22,6 @@ package tools
 
 import (
 	_ "dies.dev/diegen"
-	_ "github.com/get-woke/woke"
 	_ "github.com/google/ko"
 	_ "github.com/vmware-tanzu/carvel-kapp/cmd/kapp"
 	_ "github.com/vmware-tanzu/carvel-ytt/cmd/ytt"

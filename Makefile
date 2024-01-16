@@ -16,7 +16,6 @@ YTT ?= go run -modfile hack/go.mod github.com/vmware-tanzu/carvel-ytt/cmd/ytt
 WOKE ?= go run -modfile hack/go.mod github.com/get-woke/woke
 CA_DATA ?= dist/ca.pem
 
-
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
@@ -66,9 +65,13 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+.PHONY: get-woke
+get-woke: ## installs latest woke CLI
+	go install github.com/get-woke/woke@latest
+
 .PHONY: scan-terms
-scan-terms: ## Scan for inclusive terminology
-	@$(WOKE) . -c its-woke-rules.yaml --exit-1-on-failure
+scan-terms: get-woke ## Scan for inclusive terminology
+	woke . -c its-woke-rules.yaml --exit-1-on-failure
 
 .PHONY: woke-rules 
 woke-rules: # Downloads woke rules from https://via.vmw.com/its-woke-rules
