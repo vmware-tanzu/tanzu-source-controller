@@ -515,14 +515,20 @@ func (d *ImageRepositorySpecDie) Interval(v metav1.Duration) *ImageRepositorySpe
 	})
 }
 
-// ImagePullSecrets contains the names of the Kubernetes Secrets containing registry login information to resolve image metadata.
+// ImagePullSecrets contains the names of the Kubernetes Secrets containing registry login
+//
+// information to resolve image metadata.
 func (d *ImageRepositorySpecDie) ImagePullSecrets(v ...corev1.LocalObjectReference) *ImageRepositorySpecDie {
 	return d.DieStamp(func(r *sourcev1alpha1.ImageRepositorySpec) {
 		r.ImagePullSecrets = v
 	})
 }
 
-// ServiceAccountName is the name of the Kubernetes ServiceAccount used to authenticate the image pull if the service account has attached pull secrets. For more information: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account
+// ServiceAccountName is the name of the Kubernetes ServiceAccount used to authenticate
+//
+// the image pull if the service account has attached pull secrets. For more information:
+//
+// https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account
 func (d *ImageRepositorySpecDie) ServiceAccountName(v string) *ImageRepositorySpecDie {
 	return d.DieStamp(func(r *sourcev1alpha1.ImageRepositorySpec) {
 		r.ServiceAccountName = v
@@ -717,7 +723,9 @@ func (d *ImageRepositoryStatusDie) Status(v apis.Status) *ImageRepositoryStatusD
 	})
 }
 
-// URL is the download link for the artifact output of the last repository sync.
+// URL is the download link for the artifact output of the last repository
+//
+// sync.
 func (d *ImageRepositoryStatusDie) URL(v string) *ImageRepositoryStatusDie {
 	return d.DieStamp(func(r *sourcev1alpha1.ImageRepositoryStatus) {
 		r.URL = v
@@ -927,7 +935,11 @@ func (d *ArtifactDie) URL(v string) *ArtifactDie {
 	})
 }
 
-// Revision is a human readable identifier traceable in the origin source system. It can be a Git commit SHA, Git tag, a Helm index timestamp, a Helm chart version, etc.
+// Revision is a human readable identifier traceable in the origin source
+//
+// system. It can be a Git commit SHA, Git tag, a Helm index timestamp, a Helm
+//
+// chart version, etc.
 func (d *ArtifactDie) Revision(v string) *ArtifactDie {
 	return d.DieStamp(func(r *sourcev1alpha1.Artifact) {
 		r.Revision = v
@@ -941,7 +953,9 @@ func (d *ArtifactDie) Checksum(v string) *ArtifactDie {
 	})
 }
 
-// LastUpdateTime is the timestamp corresponding to the last update of this artifact.
+// LastUpdateTime is the timestamp corresponding to the last update of this
+//
+// artifact.
 func (d *ArtifactDie) LastUpdateTime(v metav1.Time) *ArtifactDie {
 	return d.DieStamp(func(r *sourcev1alpha1.Artifact) {
 		r.LastUpdateTime = v
@@ -1430,7 +1444,9 @@ func (d *MavenArtifactSpecDie) Interval(v metav1.Duration) *MavenArtifactSpecDie
 	})
 }
 
-// Timeout for artifact download operation. Defaults to 'Interval' duration.
+// Timeout for artifact download operation.
+//
+// Defaults to 'Interval' duration.
 func (d *MavenArtifactSpecDie) Timeout(v *metav1.Duration) *MavenArtifactSpecDie {
 	return d.DieStamp(func(r *sourcev1alpha1.MavenArtifactSpec) {
 		r.Timeout = v
@@ -1625,7 +1641,9 @@ func (d *MavenArtifactStatusDie) Status(v apis.Status) *MavenArtifactStatusDie {
 	})
 }
 
-// URL is the download link for the artifact output of the last repository sync.
+// URL is the download link for the artifact output of the last repository
+//
+// sync.
 func (d *MavenArtifactStatusDie) URL(v string) *MavenArtifactStatusDie {
 	return d.DieStamp(func(r *sourcev1alpha1.MavenArtifactStatus) {
 		r.URL = v
@@ -1828,7 +1846,15 @@ func (d *MavenArtifactTypeDie) GroupId(v string) *MavenArtifactTypeDie {
 	})
 }
 
-// Artifact Version The version element identifies the current version of the artifact. Supported values: "0.1.2" (version) and "RELEASE" Unsupported values: "LATEST", "SNAPSHOT" and Maven Version Ranges https://maven.apache.org/enforcer/enforcer-rules/versionRanges.html
+// Artifact Version
+//
+// The version element identifies the current version of the artifact.
+//
+// Supported values: "0.1.2" (version) and "RELEASE"
+//
+// Unsupported values: "LATEST", "SNAPSHOT" and Maven Version Ranges
+//
+// https://maven.apache.org/enforcer/enforcer-rules/versionRanges.html
 func (d *MavenArtifactTypeDie) Version(v string) *MavenArtifactTypeDie {
 	return d.DieStamp(func(r *sourcev1alpha1.MavenArtifactType) {
 		r.Version = v
@@ -2045,13 +2071,25 @@ func (d *RepositoryDie) URL(v string) *RepositoryDie {
 	})
 }
 
-// SecretRef can be given the name of a secret containing Authentication data.
+// SecretRef can be given the name of a secret containing
 //
-// For Basic Authentication use - username: <BASE64> password: <BASE64>
+// Authentication data.
 //
-// For mTLS authenticationa use - certFile: <BASE64> a PEM-encoded client certificate - keyFile: <BASE64> private key
+// # For Basic Authentication use
 //
-// For a Certificate Authority to trust while connecting use - caFile: <BASE64> a PEM-encoded CA certificate
+// - username: <BASE64>
+//
+// password: <BASE64>
+//
+// # For mTLS authenticationa use
+//
+// - certFile: <BASE64> a PEM-encoded client certificate
+//
+// - keyFile: <BASE64> private key
+//
+// # For a Certificate Authority to trust while connecting use
+//
+// - caFile: <BASE64> a PEM-encoded CA certificate
 func (d *RepositoryDie) SecretRef(v corev1.LocalObjectReference) *RepositoryDie {
 	return d.DieStamp(func(r *sourcev1alpha1.Repository) {
 		r.SecretRef = v
