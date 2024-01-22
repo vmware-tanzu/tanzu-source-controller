@@ -7,7 +7,7 @@ toolchain go1.21.5
 require (
 	dies.dev/diegen v0.9.0
 	github.com/google/ko v0.15.1
-	github.com/vmware-tanzu/carvel-kapp v0.59.2
+	github.com/vmware-tanzu/carvel-kapp v0.60.0
 	github.com/vmware-tanzu/carvel-ytt v0.46.3
 	golang.org/x/tools v0.17.0
 	sigs.k8s.io/controller-tools v0.14.0
@@ -96,7 +96,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/k14s/difflib v0.0.0-20201117154628-0c031775bf57 // indirect
+	github.com/k14s/difflib v0.0.0-20240118055029-596a7a5585c3 // indirect
 	github.com/k14s/starlark-go v0.0.0-20200720175618-3a5c849cc368 // indirect
 	github.com/k14s/ytt v0.36.0 // indirect
 	github.com/klauspost/compress v1.17.2 // indirect
