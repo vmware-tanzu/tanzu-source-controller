@@ -8,7 +8,7 @@ require (
 	dies.dev/diegen v0.9.0
 	github.com/google/ko v0.15.1
 	github.com/vmware-tanzu/carvel-kapp v0.60.0
-	github.com/vmware-tanzu/carvel-ytt v0.46.3
+	github.com/vmware-tanzu/carvel-ytt v0.47.0
 	golang.org/x/tools v0.17.0
 	sigs.k8s.io/controller-tools v0.14.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.3.0
