@@ -40,8 +40,8 @@ cloud.google.com/go/storage v1.6.0/go.mod h1:N7U0C8pVQ/+NIKOBQyamJIeKQKkZ+mxpohl
 cloud.google.com/go/storage v1.8.0/go.mod h1:Wv1Oy7z6Yz3DshWRJFhqM/UCfaWIRTdp0RXyy7KQOVs=
 cloud.google.com/go/storage v1.10.0/go.mod h1:FLPqc6j+Ki4BU591ie1oL6qBQGu2Bl/tZ9ullr3+Kg0=
 cloud.google.com/go/storage v1.14.0/go.mod h1:GrKmX003DSIwi9o29oFT7YDnHYwZoctc3fOKtUw0Xmo=
-dies.dev/diegen v0.9.0 h1:R93K2M9UYLk2kUiDBdNkzAuHGofmzmvfR7v2OyfWKuc=
-dies.dev/diegen v0.9.0/go.mod h1:zs6MsYz+EEw4vSQjGhH9y3NFPupZZazb5CguUJpO0Zc=
+dies.dev/diegen v0.10.0 h1:exldvX8g4eIxrab9QYE4zt4c5G+mFsp2EPPqdkVVPP8=
+dies.dev/diegen v0.10.0/go.mod h1:rfSDZ7WoP1IWA12jsaL+3BUbCkns2wVgU9oNjwuCRKw=
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/Azure/azure-sdk-for-go v68.0.0+incompatible h1:fcYLmCpyNYRnvJbPerq7U0hS+6+I79yEDJBqVNcqUzU=
 github.com/Azure/azure-sdk-for-go v68.0.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=

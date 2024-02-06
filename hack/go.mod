@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.5
 
 require (
-	dies.dev/diegen v0.9.0
+	dies.dev/diegen v0.10.0
 	github.com/google/ko v0.15.1
 	github.com/vmware-tanzu/carvel-kapp v0.60.0
 	github.com/vmware-tanzu/carvel-ytt v0.47.0
