@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-go@v4
+    - uses: actions/setup-go@v5
       with:
         go-version-file: "go.mod"
     - name: Generate
@@ -47,10 +47,10 @@ jobs:
       BUNDLE: registry.local/source/bundle
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-go@v4
+    - uses: actions/setup-go@v5
       with:
         go-version-file: "go.mod"
-    - uses: carvel-dev/setup-action@v1
+    - uses: carvel-dev/setup-action@v2
       with:
        token: ${{ secrets.GITHUB_TOKEN }}
     - name: Generate certs
@@ -136,7 +136,7 @@ jobs:
           imgpkg push -f "${scratch}" -b "${BUNDLE}"
           imgpkg copy -b "${BUNDLE}" --to-tar source-controller-bundle.tar
         echo "##[endgroup]"
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: source-controller-bundle.tar
         path: source-controller-bundle.tar
@@ -165,15 +165,16 @@ jobs:
         - 1.26.6
         - 1.27.3
         - 1.28.0
+        - 1.29.0
     env:
       REGISTRY_NAME: registry.local
       BUNDLE: registry.local/source/bundle
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-go@v4
+    - uses: actions/setup-go@v5
       with:
         go-version-file: "go.mod"
-    - uses: carvel-dev/setup-action@v1
+    - uses: carvel-dev/setup-action@v2
       with:
        token: ${{ secrets.GITHUB_TOKEN }}
     - name: Install kind
@@ -284,7 +285,7 @@ jobs:
             help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
         EOF
     - name: Download staged Source Controller build
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: source-controller-bundle.tar
     - name: Relocate bundle
@@ -550,7 +551,7 @@ jobs:
         release_name: Release ${{ steps.get_version.outputs.VERSION }}
         draft: true
     - name: Download staged Source Controller build
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: source-controller-bundle.tar
     - name: Upload Source Controller release
