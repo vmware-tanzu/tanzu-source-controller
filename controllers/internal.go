@@ -137,7 +137,12 @@ func (r *MavenResolver) processSnapshotVersion(ctx context.Context, client *http
 	}
 
 	// update artifact resolved version
-	r.ResolvedVersion = metadata.SnapshotResolvedVersion(r.Artifact.Type)
+	// if metadata contains snapshotVersions, resolve using snapshotVersions
+	if len(metadata.Versioning.SnapshotVersions.SnapshotVersion) > 0 {
+		r.ResolvedVersion = metadata.SnapshotResolvedVersion(r.Artifact.Type)
+	} else {
+		r.ResolvedVersion = r.Artifact.Version
+	}
 
 	// set artificat filename
 	if len(r.Artifact.Classifier) > 0 {
