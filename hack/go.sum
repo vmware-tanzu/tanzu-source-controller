@@ -14,8 +14,8 @@ cloud.google.com/go/datastore v1.0.0/go.mod h1:LXYbyblFSglQ5pkeyhO+Qmw7ukd3C+pD7
 cloud.google.com/go/firestore v1.1.0/go.mod h1:ulACoGHTpvq5r8rxGJ4ddJZBZqakUQqClKRT5SZwBmk=
 cloud.google.com/go/pubsub v1.0.1/go.mod h1:R0Gpsv3s54REJCy4fxDixWD93lHJMoZTyQ2kNxGRt3I=
 cloud.google.com/go/storage v1.0.0/go.mod h1:IhtSnM/ZTZV8YYJWCY8RULGVqBDmpoyjwiyrjsg+URw=
-dies.dev/diegen v0.10.0 h1:exldvX8g4eIxrab9QYE4zt4c5G+mFsp2EPPqdkVVPP8=
-dies.dev/diegen v0.10.0/go.mod h1:rfSDZ7WoP1IWA12jsaL+3BUbCkns2wVgU9oNjwuCRKw=
+dies.dev/diegen v0.10.1 h1:bUjO7L3ALdyT6nRuntcCAfy4Vx4ny4cC8kemT/GY240=
+dies.dev/diegen v0.10.1/go.mod h1:08auIh8JtE32P7wVv7IC1EmAxSRoziWLwbOiMfk8cNI=
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/Azure/azure-sdk-for-go v68.0.0+incompatible h1:fcYLmCpyNYRnvJbPerq7U0hS+6+I79yEDJBqVNcqUzU=
 github.com/Azure/azure-sdk-for-go v68.0.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
