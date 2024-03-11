@@ -1,5 +1,5 @@
 #@data/values-schema
-#@schema/desc "OpenAPIv3 Schema for Cartographer Conventions"
+#@schema/desc "OpenAPIv3 Schema for Tanzu Source Controller"
 
 ---
 #@schema/desc "Optional: PEM Encoded certificate data for image registries with private CA."
