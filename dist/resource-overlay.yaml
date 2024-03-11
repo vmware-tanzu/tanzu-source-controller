@@ -15,14 +15,14 @@
 #@ load("@ytt:overlay", "overlay")
 #@ load("@ytt:data", "data")
 
-#@ def sourec-controller_deployment():
+#@ def sourec_controller_deployment():
 kind: Deployment
 metadata:
   name: source-controller-manager
   namespace: source-system
 #@ end
 
-#@overlay/match by=overlay.subset(sourec-controller_deployment()), expects="0+"
+#@overlay/match by=overlay.subset(sourec_controller_deployment()), expects="0+"
 ---
 spec:
   template:
