@@ -10,7 +10,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.19.0
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20230517160804-b7ad3f13a62c
-	github.com/vmware-labs/reconciler-runtime v0.18.0
+	github.com/vmware-labs/reconciler-runtime v0.19.0
 	github.com/vmware-tanzu/carvel-imgpkg v0.38.0
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.29.2
@@ -104,13 +104,13 @@ require (
 	github.com/vbatts/tar-split v0.11.3 // indirect
 	github.com/vito/go-interact v1.0.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.19.0 // indirect
+	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/exp v0.0.0-20240205201215-2c58cdc269a3 // indirect
-	golang.org/x/net v0.21.0 // indirect
+	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/oauth2 v0.16.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
-	golang.org/x/term v0.17.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
