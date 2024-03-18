@@ -21,10 +21,10 @@ limitations under the License.
 package tools
 
 import (
+	_ "carvel.dev/ytt/cmd/ytt"
 	_ "dies.dev/diegen"
 	_ "github.com/google/ko"
 	_ "github.com/vmware-tanzu/carvel-kapp/cmd/kapp"
-	_ "github.com/vmware-tanzu/carvel-ytt/cmd/ytt"
 	_ "golang.org/x/tools/cmd/goimports"
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
 	_ "sigs.k8s.io/kustomize/kustomize/v5"

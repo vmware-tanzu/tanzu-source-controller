@@ -1,3 +1,5 @@
+carvel.dev/ytt v0.48.0 h1:NNLW6mHBxYFhz8tRlaUW4xjtDmq8u8unmC0dcsCKPxU=
+carvel.dev/ytt v0.48.0/go.mod h1:ss9N6IKCUxg5yH5xomguFBQmuLnEwQr8slbAjTToCPQ=
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.38.0/go.mod h1:990N+gfupTy94rShfmMCWGDn0LpTmnzTp2qbd1dvSRU=
@@ -560,8 +562,6 @@ github.com/vmware-tanzu/carvel-kapp-controller v0.46.2 h1:TQRXFnZ6PryhQxx+4X1w2N
 github.com/vmware-tanzu/carvel-kapp-controller v0.46.2/go.mod h1:LJf4oaNfKW8kk6ddD8uRaayaUecGiqrz278oe4AEBSc=
 github.com/vmware-tanzu/carvel-vendir v0.33.1 h1:5wzx0aRyEiorkWwrpGvACJOpFcgvmCeVqhIY9TPuLvk=
 github.com/vmware-tanzu/carvel-vendir v0.33.1/go.mod h1:cZEa46rwzPt/ROdAuIgrCXLDJ+LqxNZaNxbz8MLtwWc=
-github.com/vmware-tanzu/carvel-ytt v0.47.0 h1:iPJcZg2y00ozs5o9+ud3pfDJp2N84nGlibmecuX7jNY=
-github.com/vmware-tanzu/carvel-ytt v0.47.0/go.mod h1:Xarf0th61vX6VY07l3KBSi3uaMCQ2UyPPiCPiaVpHME=
 github.com/xdg-go/pbkdf2 v1.0.0/go.mod h1:jrpuAogTd400dnrH08LKmI/xc1MbPOebTwRqcT5RDeI=
 github.com/xdg-go/scram v1.1.2/go.mod h1:RT/sEzTbU5y00aCK8UOx6R7YryM0iF1N2MOmC3kKLN4=
 github.com/xdg-go/stringprep v1.0.4/go.mod h1:mPGuuIYwz7CmR2bT9j4GbQqutWS1zV24gijq1dTyGkM=
