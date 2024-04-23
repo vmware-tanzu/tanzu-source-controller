@@ -17,8 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	diemetav1 "dies.dev/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	diemetav1 "reconciler.io/dies/apis/meta/v1"
 
 	sourcev1alpha1 "github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1"
 )

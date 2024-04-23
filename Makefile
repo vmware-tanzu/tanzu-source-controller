@@ -7,7 +7,7 @@ KAPP_ARGS ?= "--yes=false"
 
 # Tools
 CONTROLLER_GEN ?= go run -modfile hack/go.mod sigs.k8s.io/controller-tools/cmd/controller-gen
-DIEGEN ?= go run -modfile hack/go.mod dies.dev/diegen
+DIEGEN ?= go run -modfile hack/go.mod reconciler.io/dies/diegen
 GOIMPORTS ?= go run -modfile hack/go.mod golang.org/x/tools/cmd/goimports
 KAPP ?= go run -modfile hack/go.mod github.com/vmware-tanzu/carvel-kapp/cmd/kapp
 KO ?= go run -modfile hack/go.mod github.com/google/ko

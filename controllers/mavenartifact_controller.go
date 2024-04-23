@@ -31,11 +31,11 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/vmware-labs/reconciler-runtime/reconcilers"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"reconciler.io/runtime/reconcilers"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 
