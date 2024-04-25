@@ -27,14 +27,14 @@ import (
 	osx "os"
 	reflectx "reflect"
 
-	v1 "dies.dev/apis/meta/v1"
-	apis "github.com/vmware-labs/reconciler-runtime/apis"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	jsonpath "k8s.io/client-go/util/jsonpath"
+	v1 "reconciler.io/dies/apis/meta/v1"
+	apis "reconciler.io/runtime/apis"
 	yaml "sigs.k8s.io/yaml"
 
 	sourcev1alpha1 "github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1"
