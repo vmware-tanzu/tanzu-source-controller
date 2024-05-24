@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vmware-tanzu/carvel-imgpkg/pkg/imgpkg/plainimage"
+	"carvel.dev/imgpkg/pkg/imgpkg/plainimage"
 
 	sourcev1alpha1 "github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1"
 )
