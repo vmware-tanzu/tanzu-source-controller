@@ -5,11 +5,11 @@ go 1.22.0
 toolchain go1.22.2
 
 require (
+	carvel.dev/imgpkg v0.42.1
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.19.1
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20230517160804-b7ad3f13a62c
-	github.com/vmware-tanzu/carvel-imgpkg v0.38.0
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.30.1
 	k8s.io/apimachinery v0.30.1
@@ -50,16 +50,16 @@ require (
 	github.com/awslabs/amazon-ecr-credential-helper/ecr-login v0.0.0-20230510185313-f5e39e5f34c7 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/cheggaaa/pb/v3 v3.1.4 // indirect
+	github.com/cheggaaa/pb/v3 v3.1.5 // indirect
 	github.com/chrismellard/docker-credential-acr-env v0.0.0-20230304212654-82a0ddb27589 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/cppforlife/color v1.9.1-0.20200716202919-6706ac40b835 // indirect
 	github.com/cppforlife/go-cli-ui v0.0.0-20220425131040-94f26b16bc14 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/docker/cli v24.0.0+incompatible // indirect
+	github.com/docker/cli v25.0.5+incompatible // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
-	github.com/docker/docker v24.0.9+incompatible // indirect
+	github.com/docker/docker v25.0.5+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.2 // indirect
 	github.com/evanphx/json-patch v5.9.0+incompatible // indirect
@@ -86,7 +86,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -108,8 +108,8 @@ require (
 	golang.org/x/exp v0.0.0-20240205201215-2c58cdc269a3 // indirect
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/oauth2 v0.16.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/sync v0.7.0 // indirect
+	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
