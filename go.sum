@@ -1,5 +1,5 @@
-carvel.dev/imgpkg v0.42.1 h1:HsQq8QJ+Dxp1K/VZac5UHL6WxADnWsO5iXWexUqI2W8=
-carvel.dev/imgpkg v0.42.1/go.mod h1:jYzi+SyOQ4A5x9jnkpZlW4/ezQFDYOrZGEZ4vwCG3BU=
+carvel.dev/imgpkg v0.42.2 h1:iHrdHoc40wjW/viHvXYF/urpUWv5VUh1X2sL7mXSgXM=
+carvel.dev/imgpkg v0.42.2/go.mod h1:jYzi+SyOQ4A5x9jnkpZlW4/ezQFDYOrZGEZ4vwCG3BU=
 cloud.google.com/go/compute v1.20.1 h1:6aKEtlUiwEpJzM001l0yFkpXmUVXaN8W+fbkb2AZNbg=
 cloud.google.com/go/compute v1.20.1/go.mod h1:4tCnrn48xsqlwSAiLf1HXMQk8CONslYbdiEZc9FEIbM=
 cloud.google.com/go/compute/metadata v0.2.3 h1:mg4jlk7mCAj6xXp9UJ4fjI9VUI5rubuGBW5aJ7UnBMY=
