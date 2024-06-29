@@ -22,18 +22,21 @@ limitations under the License.
 package v1alpha1
 
 import (
-	json "encoding/json"
 	fmtx "fmt"
 	osx "os"
 	reflectx "reflect"
 
+	cmp "github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	json "k8s.io/apimachinery/pkg/util/json"
 	jsonpath "k8s.io/client-go/util/jsonpath"
 	v1 "reconciler.io/dies/apis/meta/v1"
+	patch "reconciler.io/dies/patch"
 	apis "reconciler.io/runtime/apis"
 	yaml "sigs.k8s.io/yaml"
 
@@ -46,6 +49,7 @@ type ImageRepositoryDie struct {
 	v1.FrozenObjectMeta
 	mutable bool
 	r       sourcev1alpha1.ImageRepository
+	seal    sourcev1alpha1.ImageRepository
 }
 
 // DieImmutable returns a new die for the current die's state that is either mutable (`false`) or immutable (`true`).
@@ -69,6 +73,7 @@ func (d *ImageRepositoryDie) DieFeed(r sourcev1alpha1.ImageRepository) *ImageRep
 		FrozenObjectMeta: v1.FreezeObjectMeta(r.ObjectMeta),
 		mutable:          d.mutable,
 		r:                r,
+		seal:             d.seal,
 	}
 }
 
@@ -235,7 +240,51 @@ func (d *ImageRepositoryDie) DeepCopy() *ImageRepositoryDie {
 		FrozenObjectMeta: v1.FreezeObjectMeta(r.ObjectMeta),
 		mutable:          d.mutable,
 		r:                r,
+		seal:             d.seal,
 	}
+}
+
+// DieSeal returns a new die for the current die's state that is sealed for comparison in future diff and patch operations.
+func (d *ImageRepositoryDie) DieSeal() *ImageRepositoryDie {
+	return d.DieSealFeed(d.r)
+}
+
+// DieSealFeed returns a new die for the current die's state that uses a specific resource for comparison in future diff and patch operations.
+func (d *ImageRepositoryDie) DieSealFeed(r sourcev1alpha1.ImageRepository) *ImageRepositoryDie {
+	if !d.mutable {
+		d = d.DeepCopy()
+	}
+	d.seal = *r.DeepCopy()
+	return d
+}
+
+// DieSealFeedPtr returns a new die for the current die's state that uses a specific resource pointer for comparison in future diff and patch operations. If the resource is nil, the empty value is used instead.
+func (d *ImageRepositoryDie) DieSealFeedPtr(r *sourcev1alpha1.ImageRepository) *ImageRepositoryDie {
+	if r == nil {
+		r = &sourcev1alpha1.ImageRepository{}
+	}
+	return d.DieSealFeed(*r)
+}
+
+// DieSealRelease returns the sealed resource managed by the die.
+func (d *ImageRepositoryDie) DieSealRelease() sourcev1alpha1.ImageRepository {
+	return *d.seal.DeepCopy()
+}
+
+// DieSealReleasePtr returns the sealed resource pointer managed by the die.
+func (d *ImageRepositoryDie) DieSealReleasePtr() *sourcev1alpha1.ImageRepository {
+	r := d.DieSealRelease()
+	return &r
+}
+
+// DieDiff uses cmp.Diff to compare the current value of the die with the sealed value.
+func (d *ImageRepositoryDie) DieDiff(opts ...cmp.Option) string {
+	return cmp.Diff(d.seal, d.r, opts...)
+}
+
+// DiePatch generates a patch between the current value of the die and the sealed value.
+func (d *ImageRepositoryDie) DiePatch(patchType types.PatchType) ([]byte, error) {
+	return patch.Create(d.seal, d.r, patchType)
 }
 
 var _ runtime.Object = (*ImageRepositoryDie)(nil)
@@ -254,15 +303,12 @@ func (d *ImageRepositoryDie) MarshalJSON() ([]byte, error) {
 }
 
 func (d *ImageRepositoryDie) UnmarshalJSON(b []byte) error {
-	if d == ImageRepositoryBlank {
-		return fmtx.Errorf("cannot unmarshal into the blank die, create a copy first")
-	}
 	if !d.mutable {
 		return fmtx.Errorf("cannot unmarshal into immutable dies, create a mutable version first")
 	}
-	r := &sourcev1alpha1.ImageRepository{}
-	err := json.Unmarshal(b, r)
-	*d = *d.DieFeed(*r)
+	resource := &sourcev1alpha1.ImageRepository{}
+	err := json.Unmarshal(b, resource)
+	*d = *d.DieFeed(*resource)
 	return err
 }
 
@@ -277,6 +323,29 @@ func (d *ImageRepositoryDie) APIVersion(v string) *ImageRepositoryDie {
 func (d *ImageRepositoryDie) Kind(v string) *ImageRepositoryDie {
 	return d.DieStamp(func(r *sourcev1alpha1.ImageRepository) {
 		r.Kind = v
+	})
+}
+
+// TypeMetadata standard object's type metadata.
+func (d *ImageRepositoryDie) TypeMetadata(v metav1.TypeMeta) *ImageRepositoryDie {
+	return d.DieStamp(func(r *sourcev1alpha1.ImageRepository) {
+		r.TypeMeta = v
+	})
+}
+
+// TypeMetadataDie stamps the resource's TypeMeta field with a mutable die.
+func (d *ImageRepositoryDie) TypeMetadataDie(fn func(d *v1.TypeMetaDie)) *ImageRepositoryDie {
+	return d.DieStamp(func(r *sourcev1alpha1.ImageRepository) {
+		d := v1.TypeMetaBlank.DieImmutable(false).DieFeed(r.TypeMeta)
+		fn(d)
+		r.TypeMeta = d.DieRelease()
+	})
+}
+
+// Metadata standard object's metadata.
+func (d *ImageRepositoryDie) Metadata(v metav1.ObjectMeta) *ImageRepositoryDie {
+	return d.DieStamp(func(r *sourcev1alpha1.ImageRepository) {
+		r.ObjectMeta = v
 	})
 }
 
@@ -324,6 +393,7 @@ var ImageRepositorySpecBlank = (&ImageRepositorySpecDie{}).DieFeed(sourcev1alpha
 type ImageRepositorySpecDie struct {
 	mutable bool
 	r       sourcev1alpha1.ImageRepositorySpec
+	seal    sourcev1alpha1.ImageRepositorySpec
 }
 
 // DieImmutable returns a new die for the current die's state that is either mutable (`false`) or immutable (`true`).
@@ -345,6 +415,7 @@ func (d *ImageRepositorySpecDie) DieFeed(r sourcev1alpha1.ImageRepositorySpec) *
 	return &ImageRepositorySpecDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
 }
 
@@ -498,7 +569,51 @@ func (d *ImageRepositorySpecDie) DeepCopy() *ImageRepositorySpecDie {
 	return &ImageRepositorySpecDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
+}
+
+// DieSeal returns a new die for the current die's state that is sealed for comparison in future diff and patch operations.
+func (d *ImageRepositorySpecDie) DieSeal() *ImageRepositorySpecDie {
+	return d.DieSealFeed(d.r)
+}
+
+// DieSealFeed returns a new die for the current die's state that uses a specific resource for comparison in future diff and patch operations.
+func (d *ImageRepositorySpecDie) DieSealFeed(r sourcev1alpha1.ImageRepositorySpec) *ImageRepositorySpecDie {
+	if !d.mutable {
+		d = d.DeepCopy()
+	}
+	d.seal = *r.DeepCopy()
+	return d
+}
+
+// DieSealFeedPtr returns a new die for the current die's state that uses a specific resource pointer for comparison in future diff and patch operations. If the resource is nil, the empty value is used instead.
+func (d *ImageRepositorySpecDie) DieSealFeedPtr(r *sourcev1alpha1.ImageRepositorySpec) *ImageRepositorySpecDie {
+	if r == nil {
+		r = &sourcev1alpha1.ImageRepositorySpec{}
+	}
+	return d.DieSealFeed(*r)
+}
+
+// DieSealRelease returns the sealed resource managed by the die.
+func (d *ImageRepositorySpecDie) DieSealRelease() sourcev1alpha1.ImageRepositorySpec {
+	return *d.seal.DeepCopy()
+}
+
+// DieSealReleasePtr returns the sealed resource pointer managed by the die.
+func (d *ImageRepositorySpecDie) DieSealReleasePtr() *sourcev1alpha1.ImageRepositorySpec {
+	r := d.DieSealRelease()
+	return &r
+}
+
+// DieDiff uses cmp.Diff to compare the current value of the die with the sealed value.
+func (d *ImageRepositorySpecDie) DieDiff(opts ...cmp.Option) string {
+	return cmp.Diff(d.seal, d.r, opts...)
+}
+
+// DiePatch generates a patch between the current value of the die and the sealed value.
+func (d *ImageRepositorySpecDie) DiePatch(patchType types.PatchType) ([]byte, error) {
+	return patch.Create(d.seal, d.r, patchType)
 }
 
 // Image is a reference to an image in a remote repository
@@ -540,6 +655,7 @@ var ImageRepositoryStatusBlank = (&ImageRepositoryStatusDie{}).DieFeed(sourcev1a
 type ImageRepositoryStatusDie struct {
 	mutable bool
 	r       sourcev1alpha1.ImageRepositoryStatus
+	seal    sourcev1alpha1.ImageRepositoryStatus
 }
 
 // DieImmutable returns a new die for the current die's state that is either mutable (`false`) or immutable (`true`).
@@ -561,6 +677,7 @@ func (d *ImageRepositoryStatusDie) DieFeed(r sourcev1alpha1.ImageRepositoryStatu
 	return &ImageRepositoryStatusDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
 }
 
@@ -714,7 +831,51 @@ func (d *ImageRepositoryStatusDie) DeepCopy() *ImageRepositoryStatusDie {
 	return &ImageRepositoryStatusDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
+}
+
+// DieSeal returns a new die for the current die's state that is sealed for comparison in future diff and patch operations.
+func (d *ImageRepositoryStatusDie) DieSeal() *ImageRepositoryStatusDie {
+	return d.DieSealFeed(d.r)
+}
+
+// DieSealFeed returns a new die for the current die's state that uses a specific resource for comparison in future diff and patch operations.
+func (d *ImageRepositoryStatusDie) DieSealFeed(r sourcev1alpha1.ImageRepositoryStatus) *ImageRepositoryStatusDie {
+	if !d.mutable {
+		d = d.DeepCopy()
+	}
+	d.seal = *r.DeepCopy()
+	return d
+}
+
+// DieSealFeedPtr returns a new die for the current die's state that uses a specific resource pointer for comparison in future diff and patch operations. If the resource is nil, the empty value is used instead.
+func (d *ImageRepositoryStatusDie) DieSealFeedPtr(r *sourcev1alpha1.ImageRepositoryStatus) *ImageRepositoryStatusDie {
+	if r == nil {
+		r = &sourcev1alpha1.ImageRepositoryStatus{}
+	}
+	return d.DieSealFeed(*r)
+}
+
+// DieSealRelease returns the sealed resource managed by the die.
+func (d *ImageRepositoryStatusDie) DieSealRelease() sourcev1alpha1.ImageRepositoryStatus {
+	return *d.seal.DeepCopy()
+}
+
+// DieSealReleasePtr returns the sealed resource pointer managed by the die.
+func (d *ImageRepositoryStatusDie) DieSealReleasePtr() *sourcev1alpha1.ImageRepositoryStatus {
+	r := d.DieSealRelease()
+	return &r
+}
+
+// DieDiff uses cmp.Diff to compare the current value of the die with the sealed value.
+func (d *ImageRepositoryStatusDie) DieDiff(opts ...cmp.Option) string {
+	return cmp.Diff(d.seal, d.r, opts...)
+}
+
+// DiePatch generates a patch between the current value of the die and the sealed value.
+func (d *ImageRepositoryStatusDie) DiePatch(patchType types.PatchType) ([]byte, error) {
+	return patch.Create(d.seal, d.r, patchType)
 }
 
 func (d *ImageRepositoryStatusDie) Status(v apis.Status) *ImageRepositoryStatusDie {
@@ -744,6 +905,7 @@ var ArtifactBlank = (&ArtifactDie{}).DieFeed(sourcev1alpha1.Artifact{})
 type ArtifactDie struct {
 	mutable bool
 	r       sourcev1alpha1.Artifact
+	seal    sourcev1alpha1.Artifact
 }
 
 // DieImmutable returns a new die for the current die's state that is either mutable (`false`) or immutable (`true`).
@@ -765,6 +927,7 @@ func (d *ArtifactDie) DieFeed(r sourcev1alpha1.Artifact) *ArtifactDie {
 	return &ArtifactDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
 }
 
@@ -918,7 +1081,51 @@ func (d *ArtifactDie) DeepCopy() *ArtifactDie {
 	return &ArtifactDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
+}
+
+// DieSeal returns a new die for the current die's state that is sealed for comparison in future diff and patch operations.
+func (d *ArtifactDie) DieSeal() *ArtifactDie {
+	return d.DieSealFeed(d.r)
+}
+
+// DieSealFeed returns a new die for the current die's state that uses a specific resource for comparison in future diff and patch operations.
+func (d *ArtifactDie) DieSealFeed(r sourcev1alpha1.Artifact) *ArtifactDie {
+	if !d.mutable {
+		d = d.DeepCopy()
+	}
+	d.seal = *r.DeepCopy()
+	return d
+}
+
+// DieSealFeedPtr returns a new die for the current die's state that uses a specific resource pointer for comparison in future diff and patch operations. If the resource is nil, the empty value is used instead.
+func (d *ArtifactDie) DieSealFeedPtr(r *sourcev1alpha1.Artifact) *ArtifactDie {
+	if r == nil {
+		r = &sourcev1alpha1.Artifact{}
+	}
+	return d.DieSealFeed(*r)
+}
+
+// DieSealRelease returns the sealed resource managed by the die.
+func (d *ArtifactDie) DieSealRelease() sourcev1alpha1.Artifact {
+	return *d.seal.DeepCopy()
+}
+
+// DieSealReleasePtr returns the sealed resource pointer managed by the die.
+func (d *ArtifactDie) DieSealReleasePtr() *sourcev1alpha1.Artifact {
+	r := d.DieSealRelease()
+	return &r
+}
+
+// DieDiff uses cmp.Diff to compare the current value of the die with the sealed value.
+func (d *ArtifactDie) DieDiff(opts ...cmp.Option) string {
+	return cmp.Diff(d.seal, d.r, opts...)
+}
+
+// DiePatch generates a patch between the current value of the die and the sealed value.
+func (d *ArtifactDie) DiePatch(patchType types.PatchType) ([]byte, error) {
+	return patch.Create(d.seal, d.r, patchType)
 }
 
 // Path is the relative file path of this artifact.
@@ -968,6 +1175,7 @@ type MavenArtifactDie struct {
 	v1.FrozenObjectMeta
 	mutable bool
 	r       sourcev1alpha1.MavenArtifact
+	seal    sourcev1alpha1.MavenArtifact
 }
 
 // DieImmutable returns a new die for the current die's state that is either mutable (`false`) or immutable (`true`).
@@ -991,6 +1199,7 @@ func (d *MavenArtifactDie) DieFeed(r sourcev1alpha1.MavenArtifact) *MavenArtifac
 		FrozenObjectMeta: v1.FreezeObjectMeta(r.ObjectMeta),
 		mutable:          d.mutable,
 		r:                r,
+		seal:             d.seal,
 	}
 }
 
@@ -1157,7 +1366,51 @@ func (d *MavenArtifactDie) DeepCopy() *MavenArtifactDie {
 		FrozenObjectMeta: v1.FreezeObjectMeta(r.ObjectMeta),
 		mutable:          d.mutable,
 		r:                r,
+		seal:             d.seal,
 	}
+}
+
+// DieSeal returns a new die for the current die's state that is sealed for comparison in future diff and patch operations.
+func (d *MavenArtifactDie) DieSeal() *MavenArtifactDie {
+	return d.DieSealFeed(d.r)
+}
+
+// DieSealFeed returns a new die for the current die's state that uses a specific resource for comparison in future diff and patch operations.
+func (d *MavenArtifactDie) DieSealFeed(r sourcev1alpha1.MavenArtifact) *MavenArtifactDie {
+	if !d.mutable {
+		d = d.DeepCopy()
+	}
+	d.seal = *r.DeepCopy()
+	return d
+}
+
+// DieSealFeedPtr returns a new die for the current die's state that uses a specific resource pointer for comparison in future diff and patch operations. If the resource is nil, the empty value is used instead.
+func (d *MavenArtifactDie) DieSealFeedPtr(r *sourcev1alpha1.MavenArtifact) *MavenArtifactDie {
+	if r == nil {
+		r = &sourcev1alpha1.MavenArtifact{}
+	}
+	return d.DieSealFeed(*r)
+}
+
+// DieSealRelease returns the sealed resource managed by the die.
+func (d *MavenArtifactDie) DieSealRelease() sourcev1alpha1.MavenArtifact {
+	return *d.seal.DeepCopy()
+}
+
+// DieSealReleasePtr returns the sealed resource pointer managed by the die.
+func (d *MavenArtifactDie) DieSealReleasePtr() *sourcev1alpha1.MavenArtifact {
+	r := d.DieSealRelease()
+	return &r
+}
+
+// DieDiff uses cmp.Diff to compare the current value of the die with the sealed value.
+func (d *MavenArtifactDie) DieDiff(opts ...cmp.Option) string {
+	return cmp.Diff(d.seal, d.r, opts...)
+}
+
+// DiePatch generates a patch between the current value of the die and the sealed value.
+func (d *MavenArtifactDie) DiePatch(patchType types.PatchType) ([]byte, error) {
+	return patch.Create(d.seal, d.r, patchType)
 }
 
 var _ runtime.Object = (*MavenArtifactDie)(nil)
@@ -1176,15 +1429,12 @@ func (d *MavenArtifactDie) MarshalJSON() ([]byte, error) {
 }
 
 func (d *MavenArtifactDie) UnmarshalJSON(b []byte) error {
-	if d == MavenArtifactBlank {
-		return fmtx.Errorf("cannot unmarshal into the blank die, create a copy first")
-	}
 	if !d.mutable {
 		return fmtx.Errorf("cannot unmarshal into immutable dies, create a mutable version first")
 	}
-	r := &sourcev1alpha1.MavenArtifact{}
-	err := json.Unmarshal(b, r)
-	*d = *d.DieFeed(*r)
+	resource := &sourcev1alpha1.MavenArtifact{}
+	err := json.Unmarshal(b, resource)
+	*d = *d.DieFeed(*resource)
 	return err
 }
 
@@ -1199,6 +1449,29 @@ func (d *MavenArtifactDie) APIVersion(v string) *MavenArtifactDie {
 func (d *MavenArtifactDie) Kind(v string) *MavenArtifactDie {
 	return d.DieStamp(func(r *sourcev1alpha1.MavenArtifact) {
 		r.Kind = v
+	})
+}
+
+// TypeMetadata standard object's type metadata.
+func (d *MavenArtifactDie) TypeMetadata(v metav1.TypeMeta) *MavenArtifactDie {
+	return d.DieStamp(func(r *sourcev1alpha1.MavenArtifact) {
+		r.TypeMeta = v
+	})
+}
+
+// TypeMetadataDie stamps the resource's TypeMeta field with a mutable die.
+func (d *MavenArtifactDie) TypeMetadataDie(fn func(d *v1.TypeMetaDie)) *MavenArtifactDie {
+	return d.DieStamp(func(r *sourcev1alpha1.MavenArtifact) {
+		d := v1.TypeMetaBlank.DieImmutable(false).DieFeed(r.TypeMeta)
+		fn(d)
+		r.TypeMeta = d.DieRelease()
+	})
+}
+
+// Metadata standard object's metadata.
+func (d *MavenArtifactDie) Metadata(v metav1.ObjectMeta) *MavenArtifactDie {
+	return d.DieStamp(func(r *sourcev1alpha1.MavenArtifact) {
+		r.ObjectMeta = v
 	})
 }
 
@@ -1246,6 +1519,7 @@ var MavenArtifactSpecBlank = (&MavenArtifactSpecDie{}).DieFeed(sourcev1alpha1.Ma
 type MavenArtifactSpecDie struct {
 	mutable bool
 	r       sourcev1alpha1.MavenArtifactSpec
+	seal    sourcev1alpha1.MavenArtifactSpec
 }
 
 // DieImmutable returns a new die for the current die's state that is either mutable (`false`) or immutable (`true`).
@@ -1267,6 +1541,7 @@ func (d *MavenArtifactSpecDie) DieFeed(r sourcev1alpha1.MavenArtifactSpec) *Mave
 	return &MavenArtifactSpecDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
 }
 
@@ -1420,7 +1695,51 @@ func (d *MavenArtifactSpecDie) DeepCopy() *MavenArtifactSpecDie {
 	return &MavenArtifactSpecDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
+}
+
+// DieSeal returns a new die for the current die's state that is sealed for comparison in future diff and patch operations.
+func (d *MavenArtifactSpecDie) DieSeal() *MavenArtifactSpecDie {
+	return d.DieSealFeed(d.r)
+}
+
+// DieSealFeed returns a new die for the current die's state that uses a specific resource for comparison in future diff and patch operations.
+func (d *MavenArtifactSpecDie) DieSealFeed(r sourcev1alpha1.MavenArtifactSpec) *MavenArtifactSpecDie {
+	if !d.mutable {
+		d = d.DeepCopy()
+	}
+	d.seal = *r.DeepCopy()
+	return d
+}
+
+// DieSealFeedPtr returns a new die for the current die's state that uses a specific resource pointer for comparison in future diff and patch operations. If the resource is nil, the empty value is used instead.
+func (d *MavenArtifactSpecDie) DieSealFeedPtr(r *sourcev1alpha1.MavenArtifactSpec) *MavenArtifactSpecDie {
+	if r == nil {
+		r = &sourcev1alpha1.MavenArtifactSpec{}
+	}
+	return d.DieSealFeed(*r)
+}
+
+// DieSealRelease returns the sealed resource managed by the die.
+func (d *MavenArtifactSpecDie) DieSealRelease() sourcev1alpha1.MavenArtifactSpec {
+	return *d.seal.DeepCopy()
+}
+
+// DieSealReleasePtr returns the sealed resource pointer managed by the die.
+func (d *MavenArtifactSpecDie) DieSealReleasePtr() *sourcev1alpha1.MavenArtifactSpec {
+	r := d.DieSealRelease()
+	return &r
+}
+
+// DieDiff uses cmp.Diff to compare the current value of the die with the sealed value.
+func (d *MavenArtifactSpecDie) DieDiff(opts ...cmp.Option) string {
+	return cmp.Diff(d.seal, d.r, opts...)
+}
+
+// DiePatch generates a patch between the current value of the die and the sealed value.
+func (d *MavenArtifactSpecDie) DiePatch(patchType types.PatchType) ([]byte, error) {
+	return patch.Create(d.seal, d.r, patchType)
 }
 
 // Maven Artifact defines meta Type
@@ -1458,6 +1777,7 @@ var MavenArtifactStatusBlank = (&MavenArtifactStatusDie{}).DieFeed(sourcev1alpha
 type MavenArtifactStatusDie struct {
 	mutable bool
 	r       sourcev1alpha1.MavenArtifactStatus
+	seal    sourcev1alpha1.MavenArtifactStatus
 }
 
 // DieImmutable returns a new die for the current die's state that is either mutable (`false`) or immutable (`true`).
@@ -1479,6 +1799,7 @@ func (d *MavenArtifactStatusDie) DieFeed(r sourcev1alpha1.MavenArtifactStatus) *
 	return &MavenArtifactStatusDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
 }
 
@@ -1632,7 +1953,51 @@ func (d *MavenArtifactStatusDie) DeepCopy() *MavenArtifactStatusDie {
 	return &MavenArtifactStatusDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
+}
+
+// DieSeal returns a new die for the current die's state that is sealed for comparison in future diff and patch operations.
+func (d *MavenArtifactStatusDie) DieSeal() *MavenArtifactStatusDie {
+	return d.DieSealFeed(d.r)
+}
+
+// DieSealFeed returns a new die for the current die's state that uses a specific resource for comparison in future diff and patch operations.
+func (d *MavenArtifactStatusDie) DieSealFeed(r sourcev1alpha1.MavenArtifactStatus) *MavenArtifactStatusDie {
+	if !d.mutable {
+		d = d.DeepCopy()
+	}
+	d.seal = *r.DeepCopy()
+	return d
+}
+
+// DieSealFeedPtr returns a new die for the current die's state that uses a specific resource pointer for comparison in future diff and patch operations. If the resource is nil, the empty value is used instead.
+func (d *MavenArtifactStatusDie) DieSealFeedPtr(r *sourcev1alpha1.MavenArtifactStatus) *MavenArtifactStatusDie {
+	if r == nil {
+		r = &sourcev1alpha1.MavenArtifactStatus{}
+	}
+	return d.DieSealFeed(*r)
+}
+
+// DieSealRelease returns the sealed resource managed by the die.
+func (d *MavenArtifactStatusDie) DieSealRelease() sourcev1alpha1.MavenArtifactStatus {
+	return *d.seal.DeepCopy()
+}
+
+// DieSealReleasePtr returns the sealed resource pointer managed by the die.
+func (d *MavenArtifactStatusDie) DieSealReleasePtr() *sourcev1alpha1.MavenArtifactStatus {
+	r := d.DieSealRelease()
+	return &r
+}
+
+// DieDiff uses cmp.Diff to compare the current value of the die with the sealed value.
+func (d *MavenArtifactStatusDie) DieDiff(opts ...cmp.Option) string {
+	return cmp.Diff(d.seal, d.r, opts...)
+}
+
+// DiePatch generates a patch between the current value of the die and the sealed value.
+func (d *MavenArtifactStatusDie) DiePatch(patchType types.PatchType) ([]byte, error) {
+	return patch.Create(d.seal, d.r, patchType)
 }
 
 func (d *MavenArtifactStatusDie) Status(v apis.Status) *MavenArtifactStatusDie {
@@ -1662,6 +2027,7 @@ var MavenArtifactTypeBlank = (&MavenArtifactTypeDie{}).DieFeed(sourcev1alpha1.Ma
 type MavenArtifactTypeDie struct {
 	mutable bool
 	r       sourcev1alpha1.MavenArtifactType
+	seal    sourcev1alpha1.MavenArtifactType
 }
 
 // DieImmutable returns a new die for the current die's state that is either mutable (`false`) or immutable (`true`).
@@ -1683,6 +2049,7 @@ func (d *MavenArtifactTypeDie) DieFeed(r sourcev1alpha1.MavenArtifactType) *Mave
 	return &MavenArtifactTypeDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
 }
 
@@ -1836,7 +2203,51 @@ func (d *MavenArtifactTypeDie) DeepCopy() *MavenArtifactTypeDie {
 	return &MavenArtifactTypeDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
+}
+
+// DieSeal returns a new die for the current die's state that is sealed for comparison in future diff and patch operations.
+func (d *MavenArtifactTypeDie) DieSeal() *MavenArtifactTypeDie {
+	return d.DieSealFeed(d.r)
+}
+
+// DieSealFeed returns a new die for the current die's state that uses a specific resource for comparison in future diff and patch operations.
+func (d *MavenArtifactTypeDie) DieSealFeed(r sourcev1alpha1.MavenArtifactType) *MavenArtifactTypeDie {
+	if !d.mutable {
+		d = d.DeepCopy()
+	}
+	d.seal = *r.DeepCopy()
+	return d
+}
+
+// DieSealFeedPtr returns a new die for the current die's state that uses a specific resource pointer for comparison in future diff and patch operations. If the resource is nil, the empty value is used instead.
+func (d *MavenArtifactTypeDie) DieSealFeedPtr(r *sourcev1alpha1.MavenArtifactType) *MavenArtifactTypeDie {
+	if r == nil {
+		r = &sourcev1alpha1.MavenArtifactType{}
+	}
+	return d.DieSealFeed(*r)
+}
+
+// DieSealRelease returns the sealed resource managed by the die.
+func (d *MavenArtifactTypeDie) DieSealRelease() sourcev1alpha1.MavenArtifactType {
+	return *d.seal.DeepCopy()
+}
+
+// DieSealReleasePtr returns the sealed resource pointer managed by the die.
+func (d *MavenArtifactTypeDie) DieSealReleasePtr() *sourcev1alpha1.MavenArtifactType {
+	r := d.DieSealRelease()
+	return &r
+}
+
+// DieDiff uses cmp.Diff to compare the current value of the die with the sealed value.
+func (d *MavenArtifactTypeDie) DieDiff(opts ...cmp.Option) string {
+	return cmp.Diff(d.seal, d.r, opts...)
+}
+
+// DiePatch generates a patch between the current value of the die and the sealed value.
+func (d *MavenArtifactTypeDie) DiePatch(patchType types.PatchType) ([]byte, error) {
+	return patch.Create(d.seal, d.r, patchType)
 }
 
 // Artifact Group ID
@@ -1887,6 +2298,7 @@ var RepositoryBlank = (&RepositoryDie{}).DieFeed(sourcev1alpha1.Repository{})
 type RepositoryDie struct {
 	mutable bool
 	r       sourcev1alpha1.Repository
+	seal    sourcev1alpha1.Repository
 }
 
 // DieImmutable returns a new die for the current die's state that is either mutable (`false`) or immutable (`true`).
@@ -1908,6 +2320,7 @@ func (d *RepositoryDie) DieFeed(r sourcev1alpha1.Repository) *RepositoryDie {
 	return &RepositoryDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
 }
 
@@ -2061,7 +2474,51 @@ func (d *RepositoryDie) DeepCopy() *RepositoryDie {
 	return &RepositoryDie{
 		mutable: d.mutable,
 		r:       r,
+		seal:    d.seal,
 	}
+}
+
+// DieSeal returns a new die for the current die's state that is sealed for comparison in future diff and patch operations.
+func (d *RepositoryDie) DieSeal() *RepositoryDie {
+	return d.DieSealFeed(d.r)
+}
+
+// DieSealFeed returns a new die for the current die's state that uses a specific resource for comparison in future diff and patch operations.
+func (d *RepositoryDie) DieSealFeed(r sourcev1alpha1.Repository) *RepositoryDie {
+	if !d.mutable {
+		d = d.DeepCopy()
+	}
+	d.seal = *r.DeepCopy()
+	return d
+}
+
+// DieSealFeedPtr returns a new die for the current die's state that uses a specific resource pointer for comparison in future diff and patch operations. If the resource is nil, the empty value is used instead.
+func (d *RepositoryDie) DieSealFeedPtr(r *sourcev1alpha1.Repository) *RepositoryDie {
+	if r == nil {
+		r = &sourcev1alpha1.Repository{}
+	}
+	return d.DieSealFeed(*r)
+}
+
+// DieSealRelease returns the sealed resource managed by the die.
+func (d *RepositoryDie) DieSealRelease() sourcev1alpha1.Repository {
+	return *d.seal.DeepCopy()
+}
+
+// DieSealReleasePtr returns the sealed resource pointer managed by the die.
+func (d *RepositoryDie) DieSealReleasePtr() *sourcev1alpha1.Repository {
+	r := d.DieSealRelease()
+	return &r
+}
+
+// DieDiff uses cmp.Diff to compare the current value of the die with the sealed value.
+func (d *RepositoryDie) DieDiff(opts ...cmp.Option) string {
+	return cmp.Diff(d.seal, d.r, opts...)
+}
+
+// DiePatch generates a patch between the current value of the die and the sealed value.
+func (d *RepositoryDie) DiePatch(patchType types.PatchType) ([]byte, error) {
+	return patch.Create(d.seal, d.r, patchType)
 }
 
 // URL is the HTTPS address of the repository. HTTP is not supported.

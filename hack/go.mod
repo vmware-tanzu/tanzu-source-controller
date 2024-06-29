@@ -9,7 +9,7 @@ require (
 	github.com/google/ko v0.15.4
 	github.com/vmware-tanzu/carvel-kapp v0.61.0
 	golang.org/x/tools v0.22.0
-	reconciler.io/dies/diegen v0.12.0
+	reconciler.io/dies/diegen v0.13.0
 	sigs.k8s.io/controller-tools v0.15.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.4.2
 

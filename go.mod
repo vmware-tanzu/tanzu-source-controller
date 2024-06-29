@@ -2,7 +2,7 @@ module github.com/vmware-tanzu/tanzu-source-controller
 
 go 1.22.0
 
-toolchain go1.22.2
+toolchain go1.22.4
 
 require (
 	carvel.dev/imgpkg v0.42.2
@@ -14,7 +14,7 @@ require (
 	k8s.io/api v0.30.2
 	k8s.io/apimachinery v0.30.2
 	k8s.io/client-go v0.30.2
-	reconciler.io/dies v0.12.0
+	reconciler.io/dies v0.13.0
 	reconciler.io/runtime v0.20.0
 	sigs.k8s.io/controller-runtime v0.18.4
 	sigs.k8s.io/yaml v1.4.0
