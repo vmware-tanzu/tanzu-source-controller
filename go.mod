@@ -2,7 +2,7 @@ module github.com/vmware-tanzu/tanzu-source-controller
 
 go 1.22.0
 
-toolchain go1.22.2
+toolchain go1.22.4
 
 require (
 	carvel.dev/imgpkg v0.42.2
