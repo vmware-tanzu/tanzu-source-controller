@@ -1,11 +1,8 @@
 module github.com/vmware-tanzu/tanzu-source-controller
 
 go 1.22.0
-
-toolchain go1.22.4
-
 require (
-	carvel.dev/imgpkg v0.42.2
+	carvel.dev/imgpkg v0.43.0
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.20.0
@@ -109,7 +106,7 @@ require (
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/oauth2 v0.16.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
