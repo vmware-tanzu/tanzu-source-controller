@@ -1,6 +1,7 @@
 module github.com/vmware-tanzu/tanzu-source-controller
 
-go 1.22.0
+go 1.22.5
+
 require (
 	carvel.dev/imgpkg v0.43.0
 	github.com/go-logr/logr v1.4.2
