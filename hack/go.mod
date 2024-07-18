@@ -1,6 +1,7 @@
 module github.com/vmware-tanzu/tanzu-source-controller/hack
 
-go 1.22.0
+go 1.22.5
+
 require (
 	carvel.dev/ytt v0.50.0
 	github.com/google/ko v0.15.4
