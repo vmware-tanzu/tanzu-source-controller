@@ -1,11 +1,9 @@
 module github.com/vmware-tanzu/tanzu-source-controller/hack
 
-go 1.22.0
-
-toolchain go1.22.2
+go 1.22.5
 
 require (
-	carvel.dev/ytt v0.49.1
+	carvel.dev/ytt v0.50.0
 	github.com/google/ko v0.15.4
 	github.com/vmware-tanzu/carvel-kapp v0.61.0
 	golang.org/x/tools v0.22.0
