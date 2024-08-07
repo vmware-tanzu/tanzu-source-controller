@@ -6,7 +6,7 @@ require (
 	carvel.dev/imgpkg v0.43.0
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
-	github.com/google/go-containerregistry v0.20.1
+	github.com/google/go-containerregistry v0.20.2
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20230517160804-b7ad3f13a62c
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.30.3
@@ -55,9 +55,8 @@ require (
 	github.com/cppforlife/go-cli-ui v0.0.0-20220425131040-94f26b16bc14 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/docker/cli v25.0.5+incompatible // indirect
+	github.com/docker/cli v27.1.1+incompatible // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
-	github.com/docker/docker v26.1.4+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.2 // indirect
 	github.com/evanphx/json-patch v5.9.0+incompatible // indirect
