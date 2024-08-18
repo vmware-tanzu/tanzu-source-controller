@@ -20,13 +20,6 @@ rules:
   - ""
   resources:
   - secrets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - serviceaccounts
   verbs:
   - get
@@ -36,31 +29,6 @@ rules:
   - source.apps.tanzu.vmware.com
   resources:
   - imagerepositories
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - source.apps.tanzu.vmware.com
-  resources:
-  - imagerepositories/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - source.apps.tanzu.vmware.com
-  resources:
-  - imagerepositories/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - source.apps.tanzu.vmware.com
-  resources:
   - mavenartifacts
   verbs:
   - create
@@ -73,12 +41,14 @@ rules:
 - apiGroups:
   - source.apps.tanzu.vmware.com
   resources:
+  - imagerepositories/finalizers
   - mavenartifacts/finalizers
   verbs:
   - update
 - apiGroups:
   - source.apps.tanzu.vmware.com
   resources:
+  - imagerepositories/status
   - mavenartifacts/status
   verbs:
   - get
