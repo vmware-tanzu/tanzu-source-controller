@@ -8,7 +8,7 @@ require (
 	github.com/vmware-tanzu/carvel-kapp v0.61.0
 	golang.org/x/tools v0.24.0
 	reconciler.io/dies/diegen v0.14.0
-	sigs.k8s.io/controller-tools v0.16.1
+	sigs.k8s.io/controller-tools v0.16.2
 	sigs.k8s.io/kustomize/kustomize/v5 v5.4.3
 
 )
