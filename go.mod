@@ -3,7 +3,7 @@ module github.com/vmware-tanzu/tanzu-source-controller
 go 1.22.5
 
 require (
-	carvel.dev/imgpkg v0.43.0
+	carvel.dev/imgpkg v0.43.1
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.20.2
