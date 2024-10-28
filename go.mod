@@ -14,7 +14,7 @@ require (
 	k8s.io/client-go v0.31.2
 	reconciler.io/dies v0.14.0
 	reconciler.io/runtime v0.21.1
-	sigs.k8s.io/controller-runtime v0.19.0
+	sigs.k8s.io/controller-runtime v0.19.1
 	sigs.k8s.io/yaml v1.4.0
 )
 
