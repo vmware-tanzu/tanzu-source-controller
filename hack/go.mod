@@ -10,7 +10,7 @@ require (
 	github.com/vmware-tanzu/carvel-kapp v0.61.0
 	golang.org/x/tools v0.26.0
 	reconciler.io/dies/diegen v0.14.0
-	sigs.k8s.io/controller-tools v0.16.3
+	sigs.k8s.io/controller-tools v0.16.5
 	sigs.k8s.io/kustomize/kustomize/v5 v5.5.0
 
 )
@@ -68,7 +68,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
-	github.com/fatih/color v1.17.0 // indirect
+	github.com/fatih/color v1.18.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
@@ -87,7 +87,7 @@ require (
 	github.com/go-openapi/strfmt v0.23.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-openapi/validate v0.24.0 // indirect
-	github.com/gobuffalo/flect v1.0.2 // indirect
+	github.com/gobuffalo/flect v1.0.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
@@ -181,10 +181,10 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.1.0 // indirect
-	k8s.io/api v0.31.0 // indirect
-	k8s.io/apiextensions-apiserver v0.31.0 // indirect
+	k8s.io/api v0.31.2 // indirect
+	k8s.io/apiextensions-apiserver v0.31.2 // indirect
 	k8s.io/apimachinery v0.31.2 // indirect
-	k8s.io/client-go v0.31.0 // indirect
+	k8s.io/client-go v0.31.2 // indirect
 	k8s.io/component-helpers v0.29.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
