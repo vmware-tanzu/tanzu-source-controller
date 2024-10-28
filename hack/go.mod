@@ -1,6 +1,8 @@
 module github.com/vmware-tanzu/tanzu-source-controller/hack
 
-go 1.22.5
+go 1.22.7
+
+toolchain go1.23.1
 
 require (
 	carvel.dev/ytt v0.50.0
@@ -9,7 +11,7 @@ require (
 	golang.org/x/tools v0.26.0
 	reconciler.io/dies/diegen v0.14.0
 	sigs.k8s.io/controller-tools v0.16.3
-	sigs.k8s.io/kustomize/kustomize/v5 v5.4.3
+	sigs.k8s.io/kustomize/kustomize/v5 v5.5.0
 
 )
 
@@ -150,7 +152,6 @@ require (
 	go.opentelemetry.io/otel v1.28.0 // indirect
 	go.opentelemetry.io/otel/metric v1.28.0 // indirect
 	go.opentelemetry.io/otel/trace v1.28.0 // indirect
-	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
@@ -181,9 +182,9 @@ require (
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kind v0.23.0 // indirect
-	sigs.k8s.io/kustomize/api v0.17.3 // indirect
-	sigs.k8s.io/kustomize/cmd/config v0.14.2 // indirect
-	sigs.k8s.io/kustomize/kyaml v0.17.2 // indirect
+	sigs.k8s.io/kustomize/api v0.18.0 // indirect
+	sigs.k8s.io/kustomize/cmd/config v0.15.0 // indirect
+	sigs.k8s.io/kustomize/kyaml v0.18.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
