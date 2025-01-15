@@ -24,6 +24,7 @@ jobs:
         set -o nounset
         set -o pipefail
         
+        make tidy
         make manifests generate
         git diff --exit-code
     - name: Test
@@ -160,12 +161,12 @@ jobs:
     strategy:
       matrix:
         k8s:
-        - 1.24.15
-        - 1.25.9
-        - 1.26.6
-        - 1.27.3
-        - 1.28.0
-        - 1.29.0
+        - 1.27.16
+        - 1.28.15
+        - 1.29.12
+        - 1.30.8
+        - 1.31.4
+        - 1.32.0
     env:
       REGISTRY_NAME: registry.local
       BUNDLE: registry.local/source/bundle
