@@ -875,8 +875,8 @@ k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738/go.mod h1:OLgZIPagt7ERELqWJFomSt
 reconciler.io/dies/diegen v0.15.0 h1:GjalIQ3FviFtQNCQUGlEtfCV9coCP74eIghCDNtYv/E=
 reconciler.io/dies/diegen v0.15.0/go.mod h1:G61kNv5FiUThiO1urCdeQJtFDQRGKW67E0jOsxP3qw8=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
-sigs.k8s.io/controller-tools v0.17.0 h1:KaEQZbhrdY6J3zLBHplt+0aKUp8PeIttlhtF2UDo6bI=
-sigs.k8s.io/controller-tools v0.17.0/go.mod h1:SKoWY8rwGWDzHtfnhmOwljn6fViG0JF7/xmnxpklgjo=
+sigs.k8s.io/controller-tools v0.17.1 h1:bQ+dKCS7jY9AgpefenBDtm6geJZCHVKbegpLynxgyus=
+sigs.k8s.io/controller-tools v0.17.1/go.mod h1:3QXAdrmdxYuQ4MifvbCAFD9wLXn7jylnfBPYS4yVDdc=
 sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 h1:/Rv+M11QRah1itp8VhT6HoVx1Ray9eB4DBr+K+/sCJ8=
 sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3/go.mod h1:18nIHnGi6636UCz6m8i4DhaJ65T6EruyzmoQqI2BVDo=
 sigs.k8s.io/kind v0.24.0 h1:g4y4eu0qa+SCeKESLpESgMmVFBebL0BDa6f777OIWrg=
