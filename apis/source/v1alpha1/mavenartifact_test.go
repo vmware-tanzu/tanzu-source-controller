@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -94,7 +95,7 @@ func TestMavenArtifactDefault(t *testing.T) {
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			actual := c.seed.DeepCopy()
-			actual.Default()
+			_ = actual.Spec.Default()
 			if diff := cmp.Diff(c.expected, actual); diff != "" {
 				t.Errorf("(-expected, +actual): %s", diff)
 			}
@@ -104,9 +105,10 @@ func TestMavenArtifactDefault(t *testing.T) {
 
 func TestMavenArtifactValidate(t *testing.T) {
 	tests := []struct {
-		name     string
-		seed     *MavenArtifact
-		expected field.ErrorList
+		name      string
+		seed      *MavenArtifact
+		validator MavenArtifactValidator
+		expected  field.ErrorList
 	}{
 		{
 			name: "empty is not valid",
@@ -322,17 +324,17 @@ func TestMavenArtifactValidate(t *testing.T) {
 
 			expectedErr := c.expected.ToAggregate()
 
-			_, actualCreateErr := c.seed.ValidateCreate()
+			_, actualCreateErr := c.validator.ValidateCreate(context.TODO(), c.seed)
 			if diff := cmp.Diff(expectedErr, actualCreateErr); diff != "" {
 				t.Errorf("ValidateCreate (-expected, +actual): %s", diff)
 			}
 
-			_, actualUpdateErr := c.seed.ValidateUpdate(c.seed.DeepCopy())
+			_, actualUpdateErr := c.validator.ValidateUpdate(context.TODO(), c.seed, c.seed)
 			if diff := cmp.Diff(expectedErr, actualUpdateErr); diff != "" {
 				t.Errorf("ValidateCreate (-expected, +actual): %s", diff)
 			}
 
-			_, actualDeleteErr := c.seed.ValidateDelete()
+			_, actualDeleteErr := c.validator.ValidateDelete(context.TODO(), c.seed)
 			if diff := cmp.Diff(nil, actualDeleteErr); diff != "" {
 				t.Errorf("ValidateDelete (-expected, +actual): %s", diff)
 			}

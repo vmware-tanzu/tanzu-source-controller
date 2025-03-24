@@ -35,15 +35,15 @@ var MavenArtifactCondSet = apis.NewLivingConditionSet(
 	MavenArtifactConditionArtifactAvailable,
 )
 
-func (s *MavenArtifact) ManageConditions() apis.ConditionManager {
-	return s.GetConditionSet().Manage(s.GetConditionsAccessor())
+func (c *MavenArtifact) ManageConditions() apis.ConditionManager {
+	return c.GetConditionSet().Manage(c.GetConditionsAccessor())
 }
 
-func (s *MavenArtifact) GetConditionsAccessor() apis.ConditionsAccessor {
-	return &s.Status
+func (c *MavenArtifact) GetConditionsAccessor() apis.ConditionsAccessor {
+	return &c.Status
 }
 
-func (s *MavenArtifact) GetConditionSet() apis.ConditionSet {
+func (c *MavenArtifact) GetConditionSet() apis.ConditionSet {
 	return MavenArtifactCondSet
 }
 
