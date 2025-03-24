@@ -806,6 +806,34 @@ spec:
   selfSigned: {}
 ---
 apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: source-system/source-serving-cert
+  name: source-mutating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: source-webhook-service
+      namespace: source-system
+      path: /mutate-source-apps-tanzu-vmware-com-v1alpha1-mavenartifact
+  failurePolicy: Fail
+  name: mavenartifacts.source.apps.tanzu.vmware.com
+  rules:
+  - apiGroups:
+    - source.apps.tanzu.vmware.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - mavenartifacts
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   annotations:

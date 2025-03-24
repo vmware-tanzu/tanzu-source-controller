@@ -17,12 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/validation"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -31,28 +32,38 @@ import (
 
 // +kubebuilder:webhook:path=/validate-source-apps-tanzu-vmware-com-v1alpha1-mavenartifact,mutating=false,failurePolicy=fail,sideEffects=none,admissionReviewVersions=v1beta1,groups=source.apps.tanzu.vmware.com,resources=mavenartifacts,verbs=create;update,versions=v1alpha1,name=mavenartifacts.source.apps.tanzu.vmware.com
 
-var _ webhook.Validator = &MavenArtifact{}
+type MavenArtifactValidator struct{}
+
+var _ webhook.CustomValidator = &MavenArtifactValidator{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *MavenArtifact) ValidateCreate() (admission.Warnings, error) {
-	return nil, r.validate().ToAggregate()
+func (v *MavenArtifactValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	mavenArtifact, ok := obj.(*MavenArtifact)
+	if !ok {
+		return nil, fmt.Errorf("expected a MavenArtifact but got a %T", obj)
+	}
+	return nil, mavenArtifact.validate().ToAggregate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (c *MavenArtifact) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+func (v *MavenArtifactValidator) ValidateUpdate(ctx context.Context, old runtime.Object, new runtime.Object) (admission.Warnings, error) {
+	mavenArtifact, ok := new.(*MavenArtifact)
+	if !ok {
+		return nil, fmt.Errorf("expected a MavenArtifact but got a %T", new)
+	}
 	// TODO check for immutable fields
-	return nil, c.validate().ToAggregate()
+	return nil, mavenArtifact.validate().ToAggregate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (c *MavenArtifact) ValidateDelete() (admission.Warnings, error) {
+func (v *MavenArtifactValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	return nil, nil
 }
 
-func (r *MavenArtifact) validate() field.ErrorList {
+func (c *MavenArtifact) validate() field.ErrorList {
 	errs := field.ErrorList{}
 
-	errs = append(errs, r.Spec.validate(field.NewPath("spec"))...)
+	errs = append(errs, c.Spec.validate(field.NewPath("spec"))...)
 
 	return errs
 }
