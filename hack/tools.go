@@ -21,9 +21,9 @@ limitations under the License.
 package tools
 
 import (
+	_ "carvel.dev/kapp/cmd/kapp"
 	_ "carvel.dev/ytt/cmd/ytt"
 	_ "github.com/google/ko"
-	_ "github.com/vmware-tanzu/carvel-kapp/cmd/kapp"
 	_ "golang.org/x/tools/cmd/goimports"
 	_ "reconciler.io/dies/diegen"
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
