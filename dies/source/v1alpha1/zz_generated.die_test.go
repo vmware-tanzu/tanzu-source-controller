@@ -22,9 +22,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	testingx "testing"
-
 	testing "reconciler.io/dies/testing"
+	testingx "testing"
 )
 
 func TestImageRepositoryDie_MissingMethods(t *testingx.T) {
