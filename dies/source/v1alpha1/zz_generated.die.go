@@ -23,10 +23,8 @@ package v1alpha1
 
 import (
 	fmtx "fmt"
-	osx "os"
-	reflectx "reflect"
-
 	cmp "github.com/google/go-cmp/cmp"
+	sourcev1alpha1 "github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -35,12 +33,12 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	json "k8s.io/apimachinery/pkg/util/json"
 	jsonpath "k8s.io/client-go/util/jsonpath"
-	v1 "reconciler.io/dies/apis/meta/v1"
+	osx "os"
+	"reconciler.io/dies/apis/meta/v1"
 	patch "reconciler.io/dies/patch"
 	apis "reconciler.io/runtime/apis"
+	reflectx "reflect"
 	yaml "sigs.k8s.io/yaml"
-
-	sourcev1alpha1 "github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1"
 )
 
 var ImageRepositoryBlank = (&ImageRepositoryDie{}).DieFeed(sourcev1alpha1.ImageRepository{})

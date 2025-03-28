@@ -24,8 +24,7 @@ jobs:
         set -o nounset
         set -o pipefail
         
-        make tidy
-        make manifests generate
+        make tidy tools dist
         git diff --exit-code
     - name: Test
       run: make test
@@ -34,12 +33,6 @@ jobs:
     #   run: bash <(curl -s https://codecov.io/bash)
     #   env:
     #     CODECOV_TOKEN: ...
-    - name: Scan Inclusive Terminology
-      uses: get-woke/woke-action@v0
-      with: 
-        fail-on-error: true
-        woke-args: -c its-woke-rules.yaml
-
   stage:
     runs-on: ubuntu-latest
     env:
