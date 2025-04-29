@@ -14,8 +14,4 @@ updates:
     k8s-dependencies:
       patterns:
       - "k8s.io*"
-- package-ecosystem: gomod
-  directory: "/hack"
-  schedule:
-    interval: daily
-  open-pull-requests-limit: 10
+
