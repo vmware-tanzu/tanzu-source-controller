@@ -9,6 +9,8 @@ updates:
   directory: "/"
   schedule:
     interval: daily
+  ignore:
+    - dependency-name: "carvel.dev/imgpkg"
   open-pull-requests-limit: 10
   groups:
     k8s-dependencies:
