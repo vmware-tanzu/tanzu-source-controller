@@ -174,7 +174,7 @@ jobs:
     - name: Install kind
       run: |
         cd $(mktemp -d -t kind.XXXX)
-        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.15.0/kind-$(go env GOHOSTOS)-$(go env GOHOSTARCH)
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.29.0/kind-$(go env GOHOSTOS)-$(go env GOHOSTARCH)
         chmod +x ./kind
         sudo mv ./kind /usr/local/bin
         cd -
@@ -299,7 +299,7 @@ jobs:
 
         kapp deploy -a cert-manager -n kube-system \
           --wait-timeout 5m -y \
-          -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml
+          -f https://github.com/jetstack/cert-manager/releases/latest/download/cert-manager.yaml
     - name: Install kapp-controller
       run: |
         set -o errexit
