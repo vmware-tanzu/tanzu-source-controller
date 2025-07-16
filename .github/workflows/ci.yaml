@@ -160,6 +160,7 @@ jobs:
         - 1.30.8
         - 1.31.4
         - 1.32.0
+        - 1.33.1
     env:
       REGISTRY_NAME: registry.local
       BUNDLE: registry.local/source/bundle
