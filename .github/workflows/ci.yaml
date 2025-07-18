@@ -160,6 +160,7 @@ jobs:
         - 1.30.8
         - 1.31.4
         - 1.32.0
+        - 1.33.1
     env:
       REGISTRY_NAME: registry.local
       BUNDLE: registry.local/source/bundle
@@ -265,7 +266,6 @@ jobs:
         docker network connect kind local-registry
 
         # Document the local registry
-        # wokeignore:rule=master
         # https://github.com/kubernetes/enhancements/tree/master/keps/sig-cluster-lifecycle/generic/1755-communicating-a-local-registry
         cat <<EOF | kubectl apply -f -
         apiVersion: v1
@@ -278,6 +278,8 @@ jobs:
             host: "localhost"
             help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
         EOF
+        
+        docker image inspect kindest/node:v${{ matrix.k8s }}
     - name: Download staged Source Controller build
       uses: actions/download-artifact@v4
       with:
