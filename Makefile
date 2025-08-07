@@ -47,7 +47,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet ## Run unit tests only.
-	go test ./... -short -coverprofile cover.out
+	go test ./... -coverprofile coverage.txt
 
 tidy: ## Run go mod tidy
 	go mod tidy -v
