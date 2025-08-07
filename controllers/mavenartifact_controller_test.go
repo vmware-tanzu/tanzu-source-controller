@@ -26,7 +26,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -2037,4 +2039,292 @@ func sha1Checksum(name string) (string, error) {
 
 func setCache(file string, content string) error {
 	return os.WriteFile(file, []byte(content), os.ModePerm)
+}
+
+/*
+ * Copyright (c) 2025 Broadcom Inc.
+ * This file partially or wholly generated with the help of AI
+ * Added comprehensive test for jar file download and content validation
+ */
+
+// ... existing code ...
+
+func TestMavenArtifactJarDownloadAndValidation(t *testing.T) {
+	namespace := "test-namespace"
+	name := "my-maven-artifact"
+	groupId := "my-group"
+	artifactId := "helloworld"
+	artifactVersion := "1.1"
+	fileName := fmt.Sprintf("%s-%s.jar", artifactId, artifactVersion)
+	artifactJarToTgzFilename := "8fdea0bf0e6441c8717853230a270e4ed51cd77a"
+	checksum := "6271d8d39c1936f8e0b25c8b2d43fe671f7de1f8"
+
+	now := func() metav1.Time {
+		return metav1.Time{
+			Time: time.Unix(1, 0),
+		}
+	}
+
+	// Create a test server that serves the jar file
+	tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || subtle.ConstantTimeCompare([]byte(user), []byte("authorised_user")) != 1 || subtle.ConstantTimeCompare([]byte(pass), []byte("password")) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="test"`)
+			w.WriteHeader(401)
+			w.Write([]byte("Unauthorized\n"))
+			return
+		}
+
+		if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, artifactId, artifactVersion, fileName) {
+			// Serve the jar file
+			fileBytes, err := os.ReadFile("fixtures/maven-artifact/helloworld-1.1.jar")
+			if err != nil {
+				panic(err)
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write(fileBytes)
+		} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v.sha1", groupId, artifactId, artifactVersion, fileName) {
+			// Serve the checksum
+			checksum, err := sha1Checksum("fixtures/maven-artifact/helloworld-1.1.jar")
+			if err != nil {
+				panic(err)
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(checksum))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer tlsServer.Close()
+
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(sourcev1alpha1.AddToScheme(scheme))
+
+	artifactRootDir, err := os.MkdirTemp(os.TempDir(), "maven-artifacts.*")
+	utilruntime.Must(err)
+	defer os.RemoveAll(artifactRootDir)
+
+	validAuthorisedSecret := corev1.Secret{
+		Type: corev1.BasicAuthUsernameKey,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "authorized-stashed-secret-ref",
+			Namespace:       "test-namespace",
+			ResourceVersion: "999",
+		},
+		Data: map[string][]byte{"username": []byte("authorised_user"), "password": []byte("password")},
+	}
+
+	parent := diesourcev1alpha1.MavenArtifactBlank.
+		SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+			d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+				d.Type("jar")
+				d.ArtifactId(artifactId)
+				d.GroupId(groupId)
+				d.Version(artifactVersion)
+			})
+			d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+				d.URL(tlsServer.URL + "/ca-releases")
+				d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+			})
+			d.Interval(metav1.Duration{Duration: 5 * time.Minute})
+			d.Timeout(&metav1.Duration{Duration: 5 * time.Minute})
+		}).
+		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+			d.Namespace(namespace)
+			d.Name(name)
+			d.Generation(1)
+		}).
+		StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+			d.ObservedGeneration(1)
+			d.ConditionsDie(
+				diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+			)
+		})
+
+	rts := rtesting.SubReconcilerTests[*sourcev1alpha1.MavenArtifact]{
+		"download jar and validate contents": {
+			Resource: parent.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     artifactVersion,
+					ResolvedFileName:    fileName,
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/my-group/%s/%s/%s", tlsServer.URL, artifactId, artifactVersion, fileName),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			ExpectResource: parent.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+						d.Revision(fileName)
+						d.Path("mavenartifact/test-namespace/my-maven-artifact/" + artifactJarToTgzFilename + ".tar.gz")
+						d.URL("http://artifact.example/mavenartifact/test-namespace/my-maven-artifact/" + artifactJarToTgzFilename + ".tar.gz")
+						d.LastUpdateTime(now())
+						d.Checksum(checksum)
+					})
+					d.URL("http://artifact.example/mavenartifact/test-namespace/my-maven-artifact/" + artifactJarToTgzFilename + ".tar.gz")
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+					)
+				}).DieReleasePtr(),
+			CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact]) error {
+				// Verify that the jar file was downloaded and extracted
+				artifactPath := path.Join(artifactRootDir, "mavenartifact", namespace, name, artifactJarToTgzFilename+".tar.gz")
+
+				// Check that the tar.gz file exists
+				if _, err := os.Stat(artifactPath); os.IsNotExist(err) {
+					t.Errorf("Expected artifact file to exist at %s", artifactPath)
+					// List contents of the artifact directory for debugging
+					if files, err := os.ReadDir(path.Join(artifactRootDir, "mavenartifact", namespace, name)); err == nil {
+						t.Logf("Files in artifact directory:")
+						for _, file := range files {
+							t.Logf("  %s", file.Name())
+						}
+					}
+					return nil
+				}
+
+				// Extract and validate the jar contents
+				extractDir, err := os.MkdirTemp(os.TempDir(), "jar-validation-*")
+				if err != nil {
+					t.Fatalf("Failed to create temp directory: %v", err)
+				}
+				defer os.RemoveAll(extractDir)
+
+				// Extract the tar.gz file
+				cmd := exec.Command("tar", "-xzf", artifactPath, "-C", extractDir)
+				if err := cmd.Run(); err != nil {
+					t.Fatalf("Failed to extract tar.gz file: %v", err)
+				}
+
+				// List contents of extracted directory for debugging
+				if files, err := os.ReadDir(extractDir); err == nil {
+					t.Logf("Files in extracted directory:")
+					for _, file := range files {
+						t.Logf("  %s", file.Name())
+					}
+				}
+
+				// The tar.gz contains the extracted jar contents directly
+				// Validate the expected directory structure
+				expectedDirs := []string{
+					"META-INF",
+					"com",
+				}
+
+				for _, expectedDir := range expectedDirs {
+					dirPath := path.Join(extractDir, expectedDir)
+					if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+						t.Errorf("Expected directory %s to exist at %s", expectedDir, dirPath)
+					}
+				}
+
+				// Validate specific files exist
+				expectedFiles := []string{
+					"META-INF/MANIFEST.MF",
+					"META-INF/maven/tapi.integrations/helloworld/pom.xml",
+					"META-INF/maven/tapi.integrations/helloworld/pom.properties",
+					"com/source/controller/demo/helloworld/HelloWorld.class",
+				}
+
+				for _, expectedFile := range expectedFiles {
+					filePath := path.Join(extractDir, expectedFile)
+					if _, err := os.Stat(filePath); os.IsNotExist(err) {
+						t.Errorf("Expected file %s to exist at %s", expectedFile, filePath)
+					}
+				}
+
+				// Read and validate MANIFEST.MF contents
+				manifestPath := path.Join(extractDir, "META-INF", "MANIFEST.MF")
+				if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+					t.Errorf("Expected MANIFEST.MF to exist at %s", manifestPath)
+				} else {
+					manifestBytes, err := os.ReadFile(manifestPath)
+					if err != nil {
+						t.Fatalf("Failed to read MANIFEST.MF: %v", err)
+					}
+
+					manifestContent := string(manifestBytes)
+					if !strings.Contains(manifestContent, "Manifest-Version:") {
+						t.Errorf("Expected MANIFEST.MF to contain Manifest-Version")
+					}
+				}
+
+				// Read and validate pom.xml contents
+				pomPath := path.Join(extractDir, "META-INF", "maven", "tapi.integrations", "helloworld", "pom.xml")
+				if _, err := os.Stat(pomPath); os.IsNotExist(err) {
+					t.Errorf("Expected pom.xml to exist at %s", pomPath)
+				} else {
+					pomBytes, err := os.ReadFile(pomPath)
+					if err != nil {
+						t.Fatalf("Failed to read pom.xml: %v", err)
+					}
+
+					pomContent := string(pomBytes)
+					if !strings.Contains(pomContent, "<project") {
+						t.Errorf("Expected pom.xml to contain <project tag")
+					}
+					if !strings.Contains(pomContent, "tapi.integrations") {
+						t.Errorf("Expected pom.xml to contain groupId tapi.integrations")
+					}
+					if !strings.Contains(pomContent, "helloworld") {
+						t.Errorf("Expected pom.xml to contain artifactId helloworld")
+					}
+				}
+
+				// Read and validate pom.properties contents
+				propsPath := path.Join(extractDir, "META-INF", "maven", "tapi.integrations", "helloworld", "pom.properties")
+				if _, err := os.Stat(propsPath); os.IsNotExist(err) {
+					t.Errorf("Expected pom.properties to exist at %s", propsPath)
+				} else {
+					propsBytes, err := os.ReadFile(propsPath)
+					if err != nil {
+						t.Fatalf("Failed to read pom.properties: %v", err)
+					}
+
+					propsContent := string(propsBytes)
+					if !strings.Contains(propsContent, "groupId=tapi.integrations") {
+						t.Errorf("Expected pom.properties to contain groupId=tapi.integrations")
+					}
+					if !strings.Contains(propsContent, "artifactId=helloworld") {
+						t.Errorf("Expected pom.properties to contain artifactId=helloworld")
+					}
+					if !strings.Contains(propsContent, "version=1.1") {
+						t.Errorf("Expected pom.properties to contain version=1.1")
+					}
+				}
+
+				// Validate that the HelloWorld.class file exists and is valid
+				classPath := path.Join(extractDir, "com", "source", "controller", "demo", "helloworld", "HelloWorld.class")
+				if _, err := os.Stat(classPath); os.IsNotExist(err) {
+					t.Errorf("Expected HelloWorld.class to exist at %s", classPath)
+				} else {
+					// Verify the class file is a valid Java class file (starts with 0xCAFEBABE)
+					classBytes, err := os.ReadFile(classPath)
+					if err != nil {
+						t.Fatalf("Failed to read HelloWorld.class: %v", err)
+					}
+
+					if len(classBytes) < 4 {
+						t.Errorf("HelloWorld.class file is too small")
+					}
+
+					// Check Java class file magic number (0xCAFEBABE)
+					if classBytes[0] != 0xCA || classBytes[1] != 0xFE || classBytes[2] != 0xBA || classBytes[3] != 0xBE {
+						t.Errorf("HelloWorld.class does not have valid Java class file magic number")
+					}
+				}
+
+				t.Logf("Successfully validated jar file contents - all expected files present and valid")
+				return nil
+			},
+		},
+	}
+
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
+		return controllers.MavenArtifactDownloadSyncReconciler(artifactRootDir, "artifact.example", now)
+	})
 }
