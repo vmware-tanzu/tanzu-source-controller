@@ -572,24 +572,6 @@ rules:
   - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: source-proxy-role
-rules:
-- apiGroups:
-  - authentication.k8s.io
-  resources:
-  - tokenreviews
-  verbs:
-  - create
-- apiGroups:
-  - authorization.k8s.io
-  resources:
-  - subjectaccessreviews
-  verbs:
-  - create
----
-apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: source-leader-election-rolebinding
@@ -611,19 +593,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: source-manager-role
-subjects:
-- kind: ServiceAccount
-  name: source-controller-manager
-  namespace: source-system
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: source-proxy-rolebinding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: source-proxy-role
 subjects:
 - kind: ServiceAccount
   name: source-controller-manager
@@ -684,8 +653,8 @@ metadata:
 spec:
   ports:
   - name: https
-    port: 8443
-    targetPort: https
+    port: 8080
+    targetPort: metrics
   selector:
     control-plane: controller-manager
 ---
@@ -721,6 +690,7 @@ spec:
       containers:
       - args:
         - --health-probe-bind-address=:8081
+        - --metrics-bind-address=:8080
         - --leader-elect
         - --artifact-bind-address=:8082
         - --artifact-host=source-controller-manager-artifact-service.source-system.svc.cluster.local.
@@ -737,6 +707,9 @@ spec:
         ports:
         - containerPort: 9443
           name: webhook-server
+          protocol: TCP
+        - containerPort: 8080
+          name: metrics
           protocol: TCP
         readinessProbe:
           httpGet:

@@ -27,6 +27,7 @@ spec:
       containers:
       - args:
         - --health-probe-bind-address=:8081
+        - --metrics-bind-address=:8080
         - --leader-elect
         - --artifact-bind-address=:8082
         - --artifact-host=$(ARTIFACT_SERVICE_NAME).$(ARTIFACT_SERVICE_NAMESPACE).svc.cluster.local.
@@ -54,6 +55,10 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
+        ports:
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
         resources:
           limits:
             cpu: 750m

@@ -25,8 +25,8 @@ bases:
 #- ../prometheus
 
 patchesStrategicMerge:
-# Enable and protect the /metrics endpoint putting it behind auth.
-# - manager_auth_proxy_patch.yaml
+# Metrics endpoint is now secured using Controller-Runtime's built-in WithAuthenticationAndAuthorization feature
+# No longer need manager_auth_proxy_patch.yaml as kube-rbac-proxy is deprecated
 
 # Mount the controller config file for loading manager configurations
 # through a ComponentConfig type
