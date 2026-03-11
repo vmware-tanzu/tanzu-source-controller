@@ -14,7 +14,7 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - uses: actions/setup-go@v6
       with:
         go-version-file: "go.mod"
@@ -39,7 +39,7 @@ jobs:
       KO_DOCKER_REPO: registry.local/source
       BUNDLE: registry.local/source/bundle
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - uses: actions/setup-go@v6
       with:
         go-version-file: "go.mod"
@@ -129,7 +129,7 @@ jobs:
           imgpkg push -f "${scratch}" -b "${BUNDLE}"
           imgpkg copy -b "${BUNDLE}" --to-tar source-controller-bundle.tar
         echo "##[endgroup]"
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v6
       with:
         name: source-controller-bundle.tar
         path: source-controller-bundle.tar
@@ -161,7 +161,7 @@ jobs:
       REGISTRY_NAME: registry.local
       BUNDLE: registry.local/source/bundle
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - uses: actions/setup-go@v6
       with:
         go-version-file: "go.mod"
