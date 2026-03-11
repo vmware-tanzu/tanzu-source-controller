@@ -1898,9 +1898,7 @@ func TestMavenArtifactReconciler(t *testing.T) {
 			ExpectTracks: []rtesting.TrackRequest{
 				rtesting.NewTrackRequest(certSecret, parent, scheme),
 			},
-			ExpectedResult: reconcile.Result{
-				RequeueAfter: 5 * time.Minute,
-			},
+			ExpectedResult: reconcile.Result{},
 		},
 		"skip download": {
 			Request: request,

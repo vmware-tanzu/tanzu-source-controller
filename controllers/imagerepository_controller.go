@@ -52,7 +52,7 @@ import (
 //+kubebuilder:rbac:groups=source.apps.tanzu.vmware.com,resources=imagerepositories,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=source.apps.tanzu.vmware.com,resources=imagerepositories/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=source.apps.tanzu.vmware.com,resources=imagerepositories/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core;events.k8s.io,resources=events,verbs=get;list;watch;create;update;patch;delete
 
 // ImageRepositoryReconciler reconciles a ImageRepository object
 func ImageRepositoryReconciler(c reconcilers.Config, httpRootDir, httpHost string, now func() metav1.Time, certs []Cert) *reconcilers.ResourceReconciler[*sourcev1alpha1.ImageRepository] {
