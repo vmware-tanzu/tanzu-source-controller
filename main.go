@@ -126,7 +126,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "MavenArtifact")
 		os.Exit(1)
 	}
-	if err = ctrl.NewWebhookManagedBy(mgr).For(&sourcev1alpha1.MavenArtifact{}).
+	if err = ctrl.NewWebhookManagedBy(mgr, &sourcev1alpha1.MavenArtifact{}).
 		WithDefaulter(&sourcev1alpha1.MavenArtifactDefaulter{}).
 		WithValidator(&sourcev1alpha1.MavenArtifactValidator{}).
 		Complete(); err != nil {

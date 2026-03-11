@@ -19,20 +19,17 @@ package v1alpha1
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // +kubebuilder:webhook:path=/mutate-source-apps-tanzu-vmware-com-v1alpha1-mavenartifact,mutating=true,failurePolicy=fail,sideEffects=none,admissionReviewVersions=v1beta1,groups=source.apps.tanzu.vmware.com,resources=mavenartifacts,verbs=create;update,versions=v1alpha1,name=mavenartifacts.source.apps.tanzu.vmware.com
 
 type MavenArtifactDefaulter struct{}
 
-var _ webhook.CustomDefaulter = &MavenArtifactDefaulter{}
+var _ admission.Defaulter[*MavenArtifact] = &MavenArtifactDefaulter{}
 
-// Default implements webhook.Defaulter so a webhook will be registered for the type
-func (c *MavenArtifactDefaulter) Default(ctx context.Context, obj runtime.Object) error {
-	mavenArtifact := obj.(*MavenArtifact)
-	return mavenArtifact.Spec.Default()
+func (*MavenArtifactDefaulter) Default(ctx context.Context, obj *MavenArtifact) error {
+	return obj.Spec.Default()
 }
 
 func (s *MavenArtifactSpec) Default() error {

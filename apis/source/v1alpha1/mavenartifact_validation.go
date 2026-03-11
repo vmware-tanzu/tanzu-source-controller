@@ -23,10 +23,8 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/validation"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -34,29 +32,18 @@ import (
 
 type MavenArtifactValidator struct{}
 
-var _ webhook.CustomValidator = &MavenArtifactValidator{}
+var _ admission.Validator[*MavenArtifact] = &MavenArtifactValidator{}
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (v *MavenArtifactValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	mavenArtifact, ok := obj.(*MavenArtifact)
-	if !ok {
-		return nil, fmt.Errorf("expected a MavenArtifact but got a %T", obj)
-	}
-	return nil, mavenArtifact.validate().ToAggregate()
+func (*MavenArtifactValidator) ValidateCreate(ctx context.Context, obj *MavenArtifact) (admission.Warnings, error) {
+	return nil, obj.validate().ToAggregate()
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *MavenArtifactValidator) ValidateUpdate(ctx context.Context, old runtime.Object, new runtime.Object) (admission.Warnings, error) {
-	mavenArtifact, ok := new.(*MavenArtifact)
-	if !ok {
-		return nil, fmt.Errorf("expected a MavenArtifact but got a %T", new)
-	}
+func (*MavenArtifactValidator) ValidateUpdate(ctx context.Context, old *MavenArtifact, obj *MavenArtifact) (admission.Warnings, error) {
 	// TODO check for immutable fields
-	return nil, mavenArtifact.validate().ToAggregate()
+	return nil, obj.validate().ToAggregate()
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (v *MavenArtifactValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (*MavenArtifactValidator) ValidateDelete(ctx context.Context, obj *MavenArtifact) (admission.Warnings, error) {
 	return nil, nil
 }
 
