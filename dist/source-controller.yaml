@@ -513,6 +513,16 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - secrets
+  - serviceaccounts
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  - events.k8s.io
+  resources:
   - events
   verbs:
   - create
@@ -521,15 +531,6 @@ rules:
   - list
   - patch
   - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  - serviceaccounts
-  verbs:
-  - get
-  - list
   - watch
 - apiGroups:
   - source.apps.tanzu.vmware.com

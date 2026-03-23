@@ -81,7 +81,7 @@ func (ac *artifactCache) toString() string {
 //+kubebuilder:rbac:groups=source.apps.tanzu.vmware.com,resources=mavenartifacts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=source.apps.tanzu.vmware.com,resources=mavenartifacts/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=source.apps.tanzu.vmware.com,resources=mavenartifacts/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core;events.k8s.io,resources=events,verbs=get;list;watch;create;update;patch;delete
 
 func MavenArtifactReconciler(c reconcilers.Config, httpRootDir, httpHost string, now func() metav1.Time, certs []Cert) *reconcilers.ResourceReconciler[*sourcev1alpha1.MavenArtifact] {
 	return &reconcilers.ResourceReconciler[*sourcev1alpha1.MavenArtifact]{

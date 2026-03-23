@@ -30,3 +30,4 @@ coverage.txt
 
 # OS specific files
 .DS_Store
+.cursor

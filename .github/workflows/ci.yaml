@@ -129,7 +129,7 @@ jobs:
           imgpkg push -f "${scratch}" -b "${BUNDLE}"
           imgpkg copy -b "${BUNDLE}" --to-tar source-controller-bundle.tar
         echo "##[endgroup]"
-    - uses: actions/upload-artifact@v6
+    - uses: actions/upload-artifact@v7
       with:
         name: source-controller-bundle.tar
         path: source-controller-bundle.tar
@@ -285,7 +285,7 @@ jobs:
         
         docker image inspect kindest/node:v${{ matrix.k8s }}
     - name: Download staged Source Controller build
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v8
       with:
         name: source-controller-bundle.tar
     - name: Relocate bundle
@@ -551,7 +551,7 @@ jobs:
         release_name: Release ${{ steps.get_version.outputs.VERSION }}
         draft: true
     - name: Download staged Source Controller build
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v8
       with:
         name: source-controller-bundle.tar
     - name: Upload Source Controller release
