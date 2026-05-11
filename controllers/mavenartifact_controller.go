@@ -222,7 +222,7 @@ func MavenArtifactVersionSyncReconciler() reconcilers.SubReconciler[*sourcev1alp
 
 				log.Error(err, "error with maven-metadata", "maven-metadata.xml", mr.MetaXML)
 				parent.ManageConditions().
-					MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactResolved, "VersionError", err.Error())
+					MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactResolved, "VersionError", "%s", err.Error())
 				return nil
 
 			} else {
@@ -233,7 +233,7 @@ func MavenArtifactVersionSyncReconciler() reconcilers.SubReconciler[*sourcev1alp
 				}
 				log.Info("artifact version resolved", "artifact", mr.Artifact.ArtifactId, "resolved version", mr.ResolvedVersion)
 				parent.ManageConditions().
-					MarkTrue(sourcev1alpha1.MavenArtifactConditionArtifactResolved, "Resolved", fmt.Sprintf(`Resolved version %q for artifact %q`, artifactDetails.ArtifactVersion, mr.DownloadURL))
+					MarkTrue(sourcev1alpha1.MavenArtifactConditionArtifactResolved, "Resolved", `Resolved version %q for artifact %q`, artifactDetails.ArtifactVersion, mr.DownloadURL)
 				stashArtifactVersion(ctx, artifactDetails)
 				return nil
 			}
@@ -306,7 +306,7 @@ func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func(
 				}
 
 				parent.ManageConditions().
-					MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactAvailable, "RemoteError", err.Error())
+					MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactAvailable, "RemoteError", "%s", err.Error())
 				return nil
 			}
 
