@@ -17,4 +17,5 @@ updates:
   ignore:
   - dependency-name: "carvel.dev/imgpkg"
     versions: [">=0.100.0"]
+  - dependency-name: "github.com/google/go-containerregistry/pkg/authn/k8schain"
 
