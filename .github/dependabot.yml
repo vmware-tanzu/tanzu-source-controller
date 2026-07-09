@@ -14,4 +14,7 @@ updates:
     k8s-dependencies:
       patterns:
       - "k8s.io*"
+  ignore:
+  - dependency-name: "carvel.dev/imgpkg"
+    versions: [">=0.100.0"]
 
