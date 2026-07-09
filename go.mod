@@ -12,7 +12,7 @@ require (
 	k8s.io/api v0.36.1
 	k8s.io/apimachinery v0.36.1
 	k8s.io/client-go v0.36.1
-	reconciler.io/dies v0.19.0
+	reconciler.io/dies v0.19.1
 	reconciler.io/runtime v0.26.1
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/yaml v1.6.0
