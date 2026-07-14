@@ -207,7 +207,14 @@ func ImageRepositoryPullImageSyncReconciler(httpRootDir, httpHost string, now fu
 			if imageRef == "" {
 				return nil
 			}
-			artifactTgzFilename := fmt.Sprintf("%s.tar.gz", strings.Split(imageRef, "@sha256:")[1])
+			digest, err := name.NewDigest(imageRef, name.WeakValidation)
+			if err != nil {
+				log.Error(err, "unable to parse image digest", "image", imageRef)
+				parent.ManageConditions().MarkFalse(sourcev1alpha1.ImageRepositoryConditionImageResolved, "MalformedDigest", "Image reference %q is not a valid digest: %s", imageRef, err)
+				return nil
+			}
+			_, digestHex, _ := strings.Cut(digest.DigestStr(), ":")
+			artifactTgzFilename := fmt.Sprintf("%s.tar.gz", digestHex)
 			if !path.IsAbs(httpRootDir) {
 				httpRootDir = path.Join(httpRootDir)
 			}
