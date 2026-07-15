@@ -314,6 +314,103 @@ func TestMavenArtifactValidate(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "timeout"), &metav1.Duration{}, ""),
 			},
 		},
+		{
+			name: "invalid artifactId path traversal",
+			seed: &MavenArtifact{
+				Spec: MavenArtifactSpec{
+					Artifact: MavenArtifactType{
+						GroupId:    "com.example",
+						ArtifactId: "../../../etc/passwd",
+						Version:    "1.0.0",
+					},
+					Repository: Repository{
+						URL: "https://repo1.maven.org/maven2",
+					},
+					Interval: metav1.Duration{Duration: time.Minute},
+				},
+			},
+			expected: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "artifact", "artifactId"), "../../../etc/passwd", `must not contain path separators or ".."`),
+			},
+		},
+		{
+			name: "invalid groupId path traversal",
+			seed: &MavenArtifact{
+				Spec: MavenArtifactSpec{
+					Artifact: MavenArtifactType{
+						GroupId:    "com.example/../../etc",
+						ArtifactId: "my-artifact",
+						Version:    "1.0.0",
+					},
+					Repository: Repository{
+						URL: "https://repo1.maven.org/maven2",
+					},
+					Interval: metav1.Duration{Duration: time.Minute},
+				},
+			},
+			expected: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "artifact", "groupId"), "com.example/../../etc", `must not contain path separators or ".."`),
+			},
+		},
+		{
+			name: "invalid version path traversal",
+			seed: &MavenArtifact{
+				Spec: MavenArtifactSpec{
+					Artifact: MavenArtifactType{
+						GroupId:    "com.example",
+						ArtifactId: "my-artifact",
+						Version:    "../../../../tmp/pwn",
+					},
+					Repository: Repository{
+						URL: "https://repo1.maven.org/maven2",
+					},
+					Interval: metav1.Duration{Duration: time.Minute},
+				},
+			},
+			expected: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "artifact", "version"), "../../../../tmp/pwn", `must not contain path separators or ".."`),
+			},
+		},
+		{
+			name: "invalid type path traversal",
+			seed: &MavenArtifact{
+				Spec: MavenArtifactSpec{
+					Artifact: MavenArtifactType{
+						GroupId:    "com.example",
+						ArtifactId: "my-artifact",
+						Version:    "1.0.0",
+						Type:       "../../etc/passwd",
+					},
+					Repository: Repository{
+						URL: "https://repo1.maven.org/maven2",
+					},
+					Interval: metav1.Duration{Duration: time.Minute},
+				},
+			},
+			expected: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "artifact", "type"), "../../etc/passwd", `must not contain path separators or ".."`),
+			},
+		},
+		{
+			name: "invalid classifier path traversal",
+			seed: &MavenArtifact{
+				Spec: MavenArtifactSpec{
+					Artifact: MavenArtifactType{
+						GroupId:    "com.example",
+						ArtifactId: "my-artifact",
+						Version:    "1.0.0",
+						Classifier: "../../etc/passwd",
+					},
+					Repository: Repository{
+						URL: "https://repo1.maven.org/maven2",
+					},
+					Interval: metav1.Duration{Duration: time.Minute},
+				},
+			},
+			expected: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "artifact", "classifier"), "../../etc/passwd", `must not contain path separators or ".."`),
+			},
+		},
 	}
 
 	for _, c := range tests {

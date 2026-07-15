@@ -76,9 +76,13 @@ func (s *MavenArtifactType) validate(fldPath *field.Path) field.ErrorList {
 
 	if s.GroupId == "" {
 		errs = append(errs, field.Required(fldPath.Child("groupId"), ""))
+	} else if containsPathTraversal(s.GroupId) {
+		errs = append(errs, field.Invalid(fldPath.Child("groupId"), s.GroupId, "must not contain path separators or \"..\""))
 	}
 	if s.ArtifactId == "" {
 		errs = append(errs, field.Required(fldPath.Child("artifactId"), ""))
+	} else if containsPathTraversal(s.ArtifactId) {
+		errs = append(errs, field.Invalid(fldPath.Child("artifactId"), s.ArtifactId, "must not contain path separators or \"..\""))
 	}
 
 	if s.Version == "" {
@@ -87,9 +91,26 @@ func (s *MavenArtifactType) validate(fldPath *field.Path) field.ErrorList {
 		strings.HasPrefix(s.Version, "(") {
 		// TODO remove this validation rule when version range is resolvable
 		errs = append(errs, field.Invalid(fldPath.Child("version"), s.Version, ""))
+	} else if containsPathTraversal(s.Version) {
+		errs = append(errs, field.Invalid(fldPath.Child("version"), s.Version, "must not contain path separators or \"..\""))
+	}
+
+	if s.Type != "" && containsPathTraversal(s.Type) {
+		errs = append(errs, field.Invalid(fldPath.Child("type"), s.Type, "must not contain path separators or \"..\""))
+	}
+	if s.Classifier != "" && containsPathTraversal(s.Classifier) {
+		errs = append(errs, field.Invalid(fldPath.Child("classifier"), s.Classifier, "must not contain path separators or \"..\""))
 	}
 
 	return errs
+}
+
+// containsPathTraversal reports whether value contains a path separator or
+// is exactly "..", which would allow it to escape the directory it is
+// combined into when used to build a local filename or a remote request
+// path (e.g. via spec.artifact.{groupId,artifactId,classifier,type,version}).
+func containsPathTraversal(value string) bool {
+	return value == ".." || strings.ContainsAny(value, "/\\")
 }
 
 func (s *Repository) validate(fldPath *field.Path) field.ErrorList {
