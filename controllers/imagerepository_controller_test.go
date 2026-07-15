@@ -874,6 +874,27 @@ func TestImageRepositoryPullImageSyncReconciler(t *testing.T) {
 				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
 					d.Image(image)
 				}).DieReleasePtr(),
+		},
+		"malformed digest": {
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(helloImage + "@sha512:" + helloDigest)
+				}).DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.ImageRefStashKey:         helloImage + "@sha512:" + helloDigest,
+				controllers.ImagePullSecretsStashKey: []corev1.Secret{},
+				controllers.HttpRoundTripperStashKey: registry.Client().Transport,
+			},
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.ImageRepositorySpecDie) {
+					d.Image(helloImage + "@sha512:" + helloDigest)
+				}).
+				StatusDie(func(d *diesourcev1alpha1.ImageRepositoryStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.ImageRepositoryConditionImageResolvedBlank.Status(metav1.ConditionFalse).Reason("MalformedDigest").Message(`Image reference "`+helloImage+`@sha512:`+helloDigest+`" is not a valid digest: unsupported digest algorithm: sha512:`+helloDigest),
+						diesourcev1alpha1.ImageRepositoryConditionReadyBlank.Status(metav1.ConditionFalse).Reason("MalformedDigest").Message(`Image reference "`+helloImage+`@sha512:`+helloDigest+`" is not a valid digest: unsupported digest algorithm: sha512:`+helloDigest),
+					)
+				}).DieReleasePtr(),
 		}}
 
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.ImageRepository], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.ImageRepository] {
