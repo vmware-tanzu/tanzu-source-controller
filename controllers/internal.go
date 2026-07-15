@@ -5,12 +5,25 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"carvel.dev/imgpkg/pkg/imgpkg/plainimage"
 
 	sourcev1alpha1 "github.com/vmware-tanzu/tanzu-source-controller/apis/source/v1alpha1"
 )
+
+// sanitizeFilename returns an error if name is not a plain, single-segment
+// filename. This guards against path traversal via artifact coordinate
+// fields (groupId/artifactId/classifier/type) or a version string resolved
+// from a remote maven-metadata.xml, either of which may contain attacker
+// controlled "/" or ".." segments.
+func sanitizeFilename(name string) (string, error) {
+	if name == "" || name == "." || name == ".." || name != filepath.Base(name) {
+		return "", fmt.Errorf("resolved filename %q is not a valid filename", name)
+	}
+	return name, nil
+}
 
 type downloadError struct {
 	err            error
@@ -78,6 +91,10 @@ func (r *MavenResolver) processFixedVersion() error {
 	// set artificat download URL
 	r.DownloadURL = fmt.Sprintf("%s/%s/%s/%s", r.RepositoryURL, r.RequestPath, r.ResolvedVersion, r.ResolvedFilename)
 
+	if _, err := sanitizeFilename(r.ResolvedFilename); err != nil {
+		return fmt.Errorf("resolved artifact filename is invalid: %w", err)
+	}
+
 	return nil
 }
 
@@ -123,6 +140,11 @@ func (r *MavenResolver) processLatestVersion(ctx context.Context, client *http.C
 
 	// set artificat download URL
 	r.DownloadURL = fmt.Sprintf("%s/%s/%s/%s", r.RepositoryURL, r.RequestPath, r.ResolvedVersion, r.ResolvedFilename)
+
+	if _, err := sanitizeFilename(r.ResolvedFilename); err != nil {
+		return fmt.Errorf("resolved artifact filename is invalid: %w", err)
+	}
+
 	return nil
 }
 
@@ -153,6 +175,11 @@ func (r *MavenResolver) processSnapshotVersion(ctx context.Context, client *http
 
 	// set artificat download URL
 	r.DownloadURL = fmt.Sprintf("%s/%s/%s/%s", r.RepositoryURL, r.RequestPath, r.Artifact.Version, r.ResolvedFilename)
+
+	if _, err := sanitizeFilename(r.ResolvedFilename); err != nil {
+		return fmt.Errorf("resolved artifact filename is invalid: %w", err)
+	}
+
 	return nil
 }
 
@@ -185,6 +212,11 @@ func (r *MavenResolver) processReleaseVersion(ctx context.Context, client *http.
 
 	// set artifact download URL
 	r.DownloadURL = fmt.Sprintf("%s/%s/%s/%s", r.RepositoryURL, r.RequestPath, r.ResolvedVersion, r.ResolvedFilename)
+
+	if _, err := sanitizeFilename(r.ResolvedFilename); err != nil {
+		return fmt.Errorf("resolved artifact filename is invalid: %w", err)
+	}
+
 	return nil
 }
 
