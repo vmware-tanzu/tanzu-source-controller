@@ -680,12 +680,31 @@ func extractArchive(parentDir string, pathToJarFile string) (string, error) {
 	defer openedFile.Close()
 
 	for _, file := range openedFile.File {
-		filePath := filepath.Join(fileDestinationFolder, file.Name)
+		filePath, err := safeArchiveEntryPath(fileDestinationFolder, file.Name)
+		if err != nil {
+			return "", err
+		}
 		if err = extractFile(file, filePath); err != nil {
 			return "", err
 		}
 	}
 	return fileDestinationFolder, err
+}
+
+// safeArchiveEntryPath joins name onto destDir and rejects the result unless
+// it stays within destDir. Archive entry names are attacker controlled (the
+// archive is downloaded from a URL built from unvalidated MavenArtifact CR
+// fields), so an entry like "../../etc/evil" or an absolute path must not be
+// allowed to escape destDir (zip-slip).
+func safeArchiveEntryPath(destDir, name string) (string, error) {
+	if filepath.IsAbs(name) {
+		return "", fmt.Errorf("archive entry %q has an absolute path", name)
+	}
+	joined := filepath.Join(destDir, name)
+	if joined != destDir && !strings.HasPrefix(joined, destDir+string(os.PathSeparator)) {
+		return "", fmt.Errorf("archive entry %q escapes destination directory %q", name, destDir)
+	}
+	return joined, nil
 }
 
 func extractFile(file *zip.File, filePath string) error {
