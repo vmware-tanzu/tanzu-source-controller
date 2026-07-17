@@ -121,13 +121,16 @@ func MavenArtifactSecretsSyncReconciler(certs []Cert) reconcilers.SubReconciler[
 				stashAuthSecret(ctx, authSecret)
 			}
 
+			reconcileCerts := certs
 			if authSecret.Data != nil {
 				certBytes := authSecret.Data["caFile"]
-				certs = append(certs, Cert{Raw: certBytes})
+				reconcileCerts = make([]Cert, len(certs), len(certs)+1)
+				copy(reconcileCerts, certs)
+				reconcileCerts = append(reconcileCerts, Cert{Raw: certBytes})
 			}
 
 			// http client to be reused during reconcile
-			t, err := newTransport(ctx, certs)
+			t, err := newTransport(ctx, reconcileCerts)
 			if err != nil {
 				return err
 			}

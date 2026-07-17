@@ -289,6 +289,97 @@ func TestMavenArtifactWithCustomCA(t *testing.T) {
 	})
 }
 
+// TestMavenArtifactSecretsSyncReconciler_CertIsolationAcrossTenants guards against a
+// cross-tenant CA trust leak: MavenArtifactSecretsSyncReconciler is constructed once
+// at startup and the same *SyncReconciler instance services every MavenArtifact
+// reconcile across every namespace for the life of the process. A per-resource
+// caFile must never leak into another tenant's trusted CA pool.
+func TestMavenArtifactSecretsSyncReconciler_CertIsolationAcrossTenants(t *testing.T) {
+	namespace := "test-namespace"
+
+	tenantAServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer tenantAServer.Close()
+
+	tenantACertSecret := diecorev1.SecretBlank.
+		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+			d.Namespace(namespace)
+			d.Name("tenant-a-cert-secret")
+		}).
+		AddData("caFile", pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tenantAServer.Certificate().Raw}))
+
+	repositoryURL := "https://artifact.example.com/repository/project"
+
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(sourcev1alpha1.AddToScheme(scheme))
+
+	tenantA := diesourcev1alpha1.MavenArtifactBlank.
+		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+			d.Namespace(namespace)
+			d.Name("tenant-a-maven-artifact")
+			d.Generation(1)
+		}).
+		SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+			d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+				d.URL(repositoryURL)
+				d.SecretRef(corev1.LocalObjectReference{Name: "tenant-a-cert-secret"})
+			})
+		})
+
+	tenantB := diesourcev1alpha1.MavenArtifactBlank.
+		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+			d.Namespace(namespace)
+			d.Name("tenant-b-maven-artifact")
+			d.Generation(1)
+		}).
+		SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+			d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+				d.URL(repositoryURL)
+			})
+		})
+
+	rts := rtesting.SubReconcilerTests[*sourcev1alpha1.MavenArtifact]{
+		"tenant-a reconciles with its own caFile": {
+			Resource: tenantA.DieReleasePtr(),
+			GivenObjects: []client.Object{
+				tenantACertSecret,
+			},
+			ExpectResource: tenantA.DieReleasePtr(),
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(tenantACertSecret, tenantA.DieReleasePtr(), scheme),
+			},
+			AdditionalReconciles: []rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact]{
+				{
+					Name:           "tenant-b reconciles afterward, sharing the same reconciler instance",
+					Resource:       tenantB.DieReleasePtr(),
+					ExpectResource: tenantB.DieReleasePtr(),
+					CleanUp: func(t *testing.T, ctx context.Context, tc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact]) error {
+						client, ok := reconcilers.RetrieveValue(ctx, controllers.MavenArtifactHttpClientKey).(*http.Client)
+						if !ok || client == nil {
+							t.Fatalf("expected an http.Client to be stashed for tenant-b")
+							return nil
+						}
+						resp, err := client.Get(tenantAServer.URL)
+						if err == nil {
+							resp.Body.Close()
+							t.Errorf("tenant-b's http client trusted tenant-a's CA cert; want a certificate verification error")
+							return nil
+						}
+						if !strings.Contains(err.Error(), "certificate") {
+							t.Errorf("expected a certificate verification error, got: %v", err)
+						}
+						return nil
+					},
+				},
+			},
+		},
+	}
+
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
+		return controllers.MavenArtifactSecretsSyncReconciler([]controllers.Cert{})
+	})
+}
+
 func TestMavenArtifactVersionSyncReconciler(t *testing.T) {
 
 	scheme := runtime.NewScheme()
