@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
-    - uses: actions/setup-go@v6
+    - uses: actions/setup-go@v7
       with:
         go-version-file: "go.mod"
     - name: Generate
@@ -40,7 +40,7 @@ jobs:
       BUNDLE: registry.local/source/bundle
     steps:
     - uses: actions/checkout@v7
-    - uses: actions/setup-go@v6
+    - uses: actions/setup-go@v7
       with:
         go-version-file: "go.mod"
     - uses: carvel-dev/setup-action@v2.2.0
@@ -164,7 +164,7 @@ jobs:
       BUNDLE: registry.local/source/bundle
     steps:
     - uses: actions/checkout@v7
-    - uses: actions/setup-go@v6
+    - uses: actions/setup-go@v7
       with:
         go-version-file: "go.mod"
     - uses: carvel-dev/setup-action@v2.2.0
