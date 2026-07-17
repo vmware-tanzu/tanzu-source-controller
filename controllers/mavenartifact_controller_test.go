@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -1087,6 +1088,31 @@ func TestMavenArtifactVersionSyncReconciler(t *testing.T) {
 	})
 }
 
+// downloadArtifact writes the artifact under a randomly named temp directory, so its error
+// messages embed a nondeterministic local path. This differ normalizes that path segment so
+// tests can assert on the rest of the message.
+var tempArtifactPathPattern = regexp.MustCompile(`\S*/artifact/([^\s")]+)`)
+
+type tempArtifactPathNormalizingDiffer struct {
+	rtesting.Differ
+}
+
+func (d tempArtifactPathNormalizingDiffer) Resource(expected, actual client.Object) string {
+	return d.Differ.Resource(normalizeTempArtifactPaths(expected), normalizeTempArtifactPaths(actual))
+}
+
+func normalizeTempArtifactPaths(obj client.Object) client.Object {
+	ma, ok := obj.(*sourcev1alpha1.MavenArtifact)
+	if !ok {
+		return obj
+	}
+	ma = ma.DeepCopy()
+	for i := range ma.Status.Conditions {
+		ma.Status.Conditions[i].Message = tempArtifactPathPattern.ReplaceAllString(ma.Status.Conditions[i].Message, `<tmp>/artifact/$1`)
+	}
+	return ma
+}
+
 func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 	namespace := "test-namespace"
 	name := "my-maven-artifact"
@@ -1094,9 +1120,11 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 	artifactId := "helloworld"
 	badArtifactId := "goodbyeworld"
 	failDownloadArtifact := "fail-download"
+	checksumMismatchArtifactId := "checksum-mismatch"
 	artifactVersion := "1.1"
 	classifier := "sources"
 	failDownloadZip := fmt.Sprintf("%s-%s.zip", failDownloadArtifact, artifactVersion)
+	checksumMismatchFilename := fmt.Sprintf("%s-%s.jar", checksumMismatchArtifactId, artifactVersion)
 	fileName := fmt.Sprintf("%s-%s.jar", artifactId, artifactVersion)
 	badFilename := fmt.Sprintf("%s-%s.jar", badArtifactId, artifactVersion)
 	fileNameWithZip := fmt.Sprintf("%s-%s.zip", artifactId, artifactVersion)
@@ -1190,6 +1218,18 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 				}
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(checksum))
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, checksumMismatchArtifactId, artifactVersion, checksumMismatchFilename) {
+				fileBytes, err := os.ReadFile("fixtures/maven-artifact/helloworld-1.1.jar")
+				if err != nil {
+					panic(err)
+				}
+				w.WriteHeader(http.StatusOK)
+				w.Write(fileBytes)
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v.sha1", groupId, checksumMismatchArtifactId, artifactVersion, checksumMismatchFilename) {
+				// serve a checksum that does not match the downloaded file, triggering downloadArtifact's
+				// checksum-mismatch error path (a plain error, not a *downloadError)
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"))
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -1582,6 +1622,49 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
 						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("RemoteError").
 							Messagef(`Maven artifact checksum file not found (HTTP 404) at URL "%s/ca-releases/my-group/%s/1.1/%s-1.1.jar.sha1".`, tlsServer.URL, badArtifactId, badArtifactId),
+					)
+				}).DieReleasePtr(),
+		},
+		"downloaded artifact checksum does not match remote checksum": {
+			Differ: tempArtifactPathNormalizingDiffer{Differ: rtesting.DefaultDiffer},
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     artifactVersion,
+					ResolvedFileName:    checksumMismatchFilename,
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/my-group/%s/%s/%s", tlsServer.URL, checksumMismatchArtifactId, artifactVersion, checksumMismatchFilename),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+						d.Type("jar")
+						d.ArtifactId(checksumMismatchArtifactId)
+						d.GroupId(groupId)
+					})
+				}).DieReleasePtr(),
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(tlsServer.URL + "/ca-releases")
+						d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+					})
+					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+						d.Type("jar")
+						d.ArtifactId(checksumMismatchArtifactId)
+						d.GroupId(groupId)
+					})
+				}).
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionFalse).Reason("DownloadError").
+							Messagef(`Error downloading Maven artifact file %q: Checksum (%v) of downloaded Maven artifact file %q does not match expected remote checksum (%v). This file may have been tampered with in transit!`,
+								checksumMismatchArtifactId, artifactJarToTgzFilename, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", "<tmp>/artifact/"+checksumMismatchFilename),
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("DownloadError").
+							Messagef(`Error downloading Maven artifact file %q: Checksum (%v) of downloaded Maven artifact file %q does not match expected remote checksum (%v). This file may have been tampered with in transit!`,
+								checksumMismatchArtifactId, artifactJarToTgzFilename, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", "<tmp>/artifact/"+checksumMismatchFilename),
 					)
 				}).DieReleasePtr(),
 		},

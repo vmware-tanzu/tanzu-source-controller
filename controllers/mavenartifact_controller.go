@@ -375,7 +375,7 @@ func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func(
 
 				parent.ManageConditions().
 					MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactAvailable, "DownloadError",
-						"Error downloading Maven artifact file %q: %s", parent.Spec.Artifact.ArtifactId, dlerr.err.Error())
+						"Error downloading Maven artifact file %q: %s", parent.Spec.Artifact.ArtifactId, err.Error())
 				return nil
 			}
 
