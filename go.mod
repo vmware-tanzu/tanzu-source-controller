@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	carvel.dev/imgpkg v0.48.1
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.21.7
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20230517160804-b7ad3f13a62c
