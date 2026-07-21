@@ -1949,9 +1949,25 @@ func TestMavenArtifactReconciler(t *testing.T) {
 	fileNameWithoutType := "8fdea0bf0e6441c8717853230a270e4ed51cd77a"
 	checksum := "6271d8d39c1936f8e0b25c8b2d43fe671f7de1f8"
 
+	// TNZGOV-13098: artifact IDs used to prove the repository host cannot use an
+	// HTTP redirect to send the client's follow-up request to a different host.
+	redirectCrossHostArtifactId := "redirect-crosshost"
+	redirectCrossHostFileName := fmt.Sprintf("%s-%s.jar", redirectCrossHostArtifactId, latestVersion)
+	redirectSameHostArtifactId := "redirect-samehost"
+	redirectSameHostFileName := fmt.Sprintf("%s-%s.jar", redirectSameHostArtifactId, latestVersion)
+
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(sourcev1alpha1.AddToScheme(scheme))
+
+	// ssrfTargetServer stands in for an attacker-reachable internal endpoint (e.g.
+	// cloud IMDS). It must never be dialed by the reconciler: a cross-host redirect
+	// from tlsServer to here must be rejected before the request is ever sent.
+	ssrfTargetServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("attacker-controlled-response"))
+	}))
+	defer ssrfTargetServer.Close()
 
 	tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		func(w http.ResponseWriter, r *http.Request) {
@@ -1977,12 +1993,32 @@ func TestMavenArtifactReconciler(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(checksum))
 
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v.sha1", groupId, redirectCrossHostArtifactId, latestVersion, redirectCrossHostFileName) {
+				// checksum lookup succeeds normally; the attack is in the artifact download redirect below.
+				// fileNameWithoutType is the sha1 of the raw jar fixture (see the helloworld ".sha1" branch above).
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(fileNameWithoutType))
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, redirectCrossHostArtifactId, latestVersion, redirectCrossHostFileName) {
+				w.Header().Set("Location", ssrfTargetServer.URL+"/anything")
+				w.WriteHeader(http.StatusFound)
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v.sha1", groupId, redirectSameHostArtifactId, latestVersion, redirectSameHostFileName) {
+				// must match the sha1 of the raw jar content served after following the same-host redirect below.
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(fileNameWithoutType))
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, redirectSameHostArtifactId, latestVersion, redirectSameHostFileName) {
+				w.Header().Set("Location", fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, artifactId, latestVersion, fileName))
+				w.WriteHeader(http.StatusFound)
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
 		}(w, r)
 	}))
 	defer tlsServer.Close()
+
+	// crossHostDownloadURL/ssrfRedirectTarget are used both by the redirect handler above and to
+	// assert the exact rejection message sameHostRedirectPolicy produces.
+	crossHostDownloadURL := fmt.Sprintf("%s/ca-releases/%s/%s/%s/%s", tlsServer.URL, groupId, redirectCrossHostArtifactId, latestVersion, redirectCrossHostFileName)
+	ssrfRedirectTarget := ssrfTargetServer.URL + "/anything"
 
 	artifactRootDir, err := os.MkdirTemp(os.TempDir(), "artifacts.*")
 	utilruntime.Must(err)
@@ -2050,6 +2086,130 @@ func TestMavenArtifactReconciler(t *testing.T) {
 						d.ConditionsDie(
 							diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
 							diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved").Messagef(`Resolved version %q for artifact "%s/%s/%s/%s/%s-%s.jar"`, latestVersion, tlsServer.URL+"/ca-releases", groupId, artifactId, latestVersion, artifactId, latestVersion),
+							diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
+						)
+					}),
+			},
+
+			ExpectPatches: []rtesting.PatchRef{
+				{
+					Group:     "source.apps.tanzu.vmware.com",
+					Kind:      "MavenArtifact",
+					Namespace: parent.GetNamespace(),
+					Name:      parent.GetName(),
+					PatchType: types.MergePatchType,
+					Patch:     []byte(`{"metadata":{"finalizers":["source.apps.tanzu.vmware.com/finalizer"],"resourceVersion":"999"}}`),
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "StatusUpdated", `Updated status`),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(certSecret, parent, scheme),
+			},
+			ExpectedResult: reconcile.Result{},
+		},
+		"cross-host artifact redirect is rejected": {
+			Request: request,
+			StatusSubResourceTypes: []client.Object{
+				&sourcev1alpha1.MavenArtifact{},
+			},
+			GivenObjects: []client.Object{
+				parent.
+					SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+						d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+							d.Type("jar")
+							d.ArtifactId(redirectCrossHostArtifactId)
+							d.GroupId(groupId)
+							d.Version(latestVersion)
+						})
+						d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+							d.URL(tlsServer.URL + "/ca-releases")
+							d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+						})
+						d.Interval(metav1.Duration{Duration: 5 * time.Minute})
+						d.Timeout(&metav1.Duration{Duration: 5 * time.Minute})
+					}),
+				certSecret,
+			},
+
+			ExpectStatusUpdates: []client.Object{
+				parent.
+					StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+						d.ObservedGeneration(1)
+						d.ConditionsDie(
+							diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionFalse).Reason("DownloadError").
+								Messagef(`Error downloading Maven artifact file %q: %s download error Get %q: redirect from %q to %q crosses origin scheme/host, which is not allowed`,
+									redirectCrossHostArtifactId, crossHostDownloadURL, ssrfRedirectTarget, crossHostDownloadURL, ssrfRedirectTarget),
+							diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved").
+								Messagef(`Resolved version %q for artifact "%s/%s/%s/%s/%s"`, latestVersion, tlsServer.URL+"/ca-releases", groupId, redirectCrossHostArtifactId, latestVersion, redirectCrossHostFileName),
+							diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("DownloadError").
+								Messagef(`Error downloading Maven artifact file %q: %s download error Get %q: redirect from %q to %q crosses origin scheme/host, which is not allowed`,
+									redirectCrossHostArtifactId, crossHostDownloadURL, ssrfRedirectTarget, crossHostDownloadURL, ssrfRedirectTarget),
+						)
+					}),
+			},
+
+			ExpectPatches: []rtesting.PatchRef{
+				{
+					Group:     "source.apps.tanzu.vmware.com",
+					Kind:      "MavenArtifact",
+					Namespace: parent.GetNamespace(),
+					Name:      parent.GetName(),
+					PatchType: types.MergePatchType,
+					Patch:     []byte(`{"metadata":{"finalizers":["source.apps.tanzu.vmware.com/finalizer"],"resourceVersion":"999"}}`),
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "FinalizerPatched", "Patched finalizer %q", "source.apps.tanzu.vmware.com/finalizer"),
+				rtesting.NewEvent(parent, scheme, corev1.EventTypeNormal, "StatusUpdated", `Updated status`),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(certSecret, parent, scheme),
+			},
+			ExpectedResult: reconcile.Result{},
+		},
+		"same-host artifact redirect still succeeds": {
+			Request: request,
+			StatusSubResourceTypes: []client.Object{
+				&sourcev1alpha1.MavenArtifact{},
+			},
+			GivenObjects: []client.Object{
+				parent.
+					SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+						d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+							d.Type("jar")
+							d.ArtifactId(redirectSameHostArtifactId)
+							d.GroupId(groupId)
+							d.Version(latestVersion)
+						})
+						d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+							d.URL(tlsServer.URL + "/ca-releases")
+							d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+						})
+						d.Interval(metav1.Duration{Duration: 5 * time.Minute})
+						d.Timeout(&metav1.Duration{Duration: 5 * time.Minute})
+					}),
+				certSecret,
+			},
+
+			ExpectStatusUpdates: []client.Object{
+				parent.
+					StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+						d.ArtifactDie(func(d *diesourcev1alpha1.ArtifactDie) {
+							d.Revision(redirectSameHostFileName)
+							d.Path(fmt.Sprintf("mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
+							d.URL(fmt.Sprintf("http://artifact.example/mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
+							d.LastUpdateTime(now())
+							d.Checksum(checksum)
+						})
+						d.URL(fmt.Sprintf("http://artifact.example/mavenartifact/%s/%s/%s.tar.gz", namespace, name, fileNameWithoutType))
+						d.ObservedGeneration(1)
+						d.ConditionsDie(
+							diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionTrue).Reason("Available"),
+							diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved").
+								Messagef(`Resolved version %q for artifact "%s/%s/%s/%s/%s"`, latestVersion, tlsServer.URL+"/ca-releases", groupId, redirectSameHostArtifactId, latestVersion, redirectSameHostFileName),
 							diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionTrue).Reason("Ready"),
 						)
 					}),

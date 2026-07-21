@@ -99,6 +99,29 @@ func MavenArtifactReconciler(c reconcilers.Config, httpRootDir, httpHost string,
 	}
 }
 
+// maxRedirects matches the hop cap Go's http.Client applies by default;
+// setting CheckRedirect disables that default, so it must be replicated here.
+const maxRedirects = 10
+
+// sameHostRedirectPolicy is an http.Client.CheckRedirect func that pins every
+// redirect hop to the same scheme and host as the originally requested URL.
+// The initial repository host is operator-configured and may legitimately be
+// a private/internal address, but nothing the repository returns in a
+// redirect Location should be trusted to point anywhere else (e.g. cloud
+// IMDS) — see TNZGOV-13098.
+func sameHostRedirectPolicy(req *http.Request, via []*http.Request) error {
+	if len(via) >= maxRedirects {
+		return fmt.Errorf("stopped after %d redirects", maxRedirects)
+	}
+
+	orig := via[0].URL
+	if req.URL.Scheme != orig.Scheme || req.URL.Host != orig.Host {
+		return fmt.Errorf("redirect from %q to %q crosses origin scheme/host, which is not allowed", orig, req.URL)
+	}
+
+	return nil
+}
+
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
 
 func MavenArtifactSecretsSyncReconciler(certs []Cert) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
@@ -134,7 +157,7 @@ func MavenArtifactSecretsSyncReconciler(certs []Cert) reconcilers.SubReconciler[
 			if err != nil {
 				return err
 			}
-			client := &http.Client{Transport: t}
+			client := &http.Client{Transport: t, CheckRedirect: sameHostRedirectPolicy}
 			stashHttpClient(ctx, client)
 			return nil
 		},
