@@ -20,6 +20,13 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
+)
+
+const (
+	readHeaderTimeout = 10 * time.Second
+	readTimeout       = 30 * time.Second
+	idleTimeout       = 120 * time.Second
 )
 
 func New(addr string, dir string) *server {
@@ -34,20 +41,31 @@ type server struct {
 	Dir  string
 }
 
+// newHTTPServer builds the http.Server used to serve artifacts. WriteTimeout
+// is deliberately left unset: it bounds the entire response write, and
+// artifacts can be large enough that a fixed cap would truncate legitimate
+// downloads over slow connections.
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		IdleTimeout:       idleTimeout,
+	}
+}
+
 func (s *server) Start(ctx context.Context) error {
 	directoryHandler := http.FileServer(http.Dir(s.Dir))
-	server := http.Server{
-		Addr: s.Addr,
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasSuffix(r.URL.Path, "/") {
-				// deactivate directory listings
-				// TODO deactivate redirects for directories `dir` -> `dir/`
-				http.NotFound(w, r)
-				return
-			}
-			directoryHandler.ServeHTTP(w, r)
-		}),
-	}
+	server := newHTTPServer(s.Addr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/") {
+			// deactivate directory listings
+			// TODO deactivate redirects for directories `dir` -> `dir/`
+			http.NotFound(w, r)
+			return
+		}
+		directoryHandler.ServeHTTP(w, r)
+	}))
 
 	// shutdown server when the context closes
 	go func() {
