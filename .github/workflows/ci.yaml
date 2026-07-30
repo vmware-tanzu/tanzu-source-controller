@@ -548,9 +548,10 @@ jobs:
       with:
         name: source-controller-bundle.tar
     - name: Rename asset
-      run: mv source-controller-bundle.tar source-controller-bundle-${{ steps.get_version.outputs.VERSION }}.tar
+      run: mv source-controller-bundle.tar "source-controller-bundle-${VERSION}.tar"
+      env:
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
     - name: Draft release
-      id: create_release
       uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
