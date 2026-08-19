@@ -11,11 +11,28 @@ data:
   ca-certificates.crt: #@ base64.encode(data.values.ca_cert_data) if hasattr(data.values, "ca_cert_data") else ""
 
 #@ if hasattr(data.values, "aws_iam_role_arn"):
-#@overlay/match by=overlay.subset({"apiVersion": "v1", "kind": "ServiceAccount", "metadata":{"name": "source-controller-manager"}}) 
+#@overlay/match by=overlay.subset({"apiVersion": "v1", "kind": "ServiceAccount", "metadata":{"name": "source-controller-manager"}})
 ---
 metadata:
   #@overlay/match missing_ok=True
   annotations:
     #@overlay/match missing_ok=True
     eks.amazonaws.com/role-arn: #@ data.values.aws_iam_role_arn
+#@ end
+
+#! Loaded by the documented release install path (Makefile:79 `make deploy`,
+#! README.md:62, docs/installing-release.md:58). An identical copy lives in
+#! dist/bundle.yaml for the Package install path, since the two files are
+#! never rendered together.
+#@ if hasattr(data.values, "maven_artifact_max_size") and data.values.maven_artifact_max_size != "":
+#@overlay/match by=overlay.subset({"apiVersion": "apps/v1", "kind": "Deployment", "metadata":{"name": "source-controller-manager"}})
+---
+spec:
+  template:
+    spec:
+      containers:
+      #@overlay/match by=overlay.subset({"name": "manager"})
+      - args:
+        #@overlay/append
+        - #@ "--maven-artifact-max-size={}".format(data.values.maven_artifact_max_size)
 #@ end

@@ -22,6 +22,12 @@ spec:
           type: string
           description: "Optional: The AWS IAM Role ARN to attach to the source controller service account"
           nullable: true
+        #! type is inferred as string from default, so the value must be quoted
+        #! (e.g. "0"), not bare 0, which ytt rejects on a type mismatch.
+        maven_artifact_max_size:
+          type: string
+          description: "Maximum size of a MavenArtifact's downloaded file, and separately of its extracted contents; peak temporary disk usage can reach roughly twice this value. Applies only to MavenArtifact resources, not ImageRepository. Set to 0 to disable the limit."
+          default: "500Mi"
   template:
     spec:
       fetch:

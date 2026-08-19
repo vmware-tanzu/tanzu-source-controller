@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -33,6 +34,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"reconciler.io/runtime/reconcilers"
@@ -48,6 +50,78 @@ const (
 	MavenArtifactAuthSecretStashKey reconcilers.StashKey = sourcev1alpha1.Group + "/auth-secret"
 	MavenArtifactHttpClientKey      reconcilers.StashKey = sourcev1alpha1.Group + "/http-client"
 )
+
+// maxMetadataSize and maxChecksumSize are consts rather than flags: neither can
+// legitimately bind higher, so there is nothing for an operator to tune. 8Mi is
+// deliberately smaller than Flux's helm.MaxIndexSize (50Mi) since this
+// controller runs with a much smaller memory budget.
+const (
+	maxMetadataSize = 8 << 20 // 8Mi
+	maxChecksumSize = 8 << 10 // 8Ki
+	// maxArchiveEntries backstops entry count separately from the byte budget,
+	// since the two are independent resource dimensions.
+	maxArchiveEntries = 100_000
+)
+
+const maxArtifactSizeRecourse = "raise the limit with the --maven-artifact-max-size flag " +
+	`(Carvel data value maven_artifact_max_size), or set it to "0" to disable the limit`
+
+type sizeLimitError struct {
+	what     string
+	limit    int64
+	recourse string
+}
+
+func (e *sizeLimitError) Error() string {
+	msg := fmt.Sprintf("%s exceeds the maximum allowed size of %s", e.what, resource.NewQuantity(e.limit, resource.BinarySI).String())
+	if e.recourse != "" {
+		msg += "; " + e.recourse
+	}
+	return msg
+}
+
+type sizeBudget struct {
+	remaining int64
+	unlimited bool
+	limit     int64
+	what      string
+	recourse  string
+}
+
+func newSizeBudget(limit int64, what, recourse string) *sizeBudget {
+	return &sizeBudget{
+		remaining: limit,
+		unlimited: limit <= 0,
+		limit:     limit,
+		what:      what,
+		recourse:  recourse,
+	}
+}
+
+func (b *sizeBudget) wrap(dst io.Writer) io.Writer {
+	if b.unlimited {
+		return dst
+	}
+	return &boundedWriter{dst: dst, budget: b}
+}
+
+type boundedWriter struct {
+	dst    io.Writer
+	budget *sizeBudget
+}
+
+func (w *boundedWriter) Write(p []byte) (int, error) {
+	if int64(len(p)) > w.budget.remaining {
+		return 0, &sizeLimitError{
+			what:     w.budget.what,
+			limit:    w.budget.limit,
+			recourse: w.budget.recourse,
+		}
+	}
+	n, err := w.dst.Write(p)
+	w.budget.remaining -= int64(n)
+	return n, err
+}
 
 type MavenArtifactAuthOptionsFromSecret struct {
 	Username string
@@ -83,14 +157,14 @@ func (ac *artifactCache) toString() string {
 //+kubebuilder:rbac:groups=source.apps.tanzu.vmware.com,resources=mavenartifacts/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core;events.k8s.io,resources=events,verbs=get;list;watch;create;update;patch;delete
 
-func MavenArtifactReconciler(c reconcilers.Config, httpRootDir, httpHost string, now func() metav1.Time, certs []Cert) *reconcilers.ResourceReconciler[*sourcev1alpha1.MavenArtifact] {
+func MavenArtifactReconciler(c reconcilers.Config, httpRootDir, httpHost string, now func() metav1.Time, certs []Cert, maxArtifactSize int64) *reconcilers.ResourceReconciler[*sourcev1alpha1.MavenArtifact] {
 	return &reconcilers.ResourceReconciler[*sourcev1alpha1.MavenArtifact]{
 		Reconciler: &reconcilers.WithFinalizer[*sourcev1alpha1.MavenArtifact]{
 			Finalizer: sourcev1alpha1.Group + "/finalizer",
 			Reconciler: reconcilers.Sequence[*sourcev1alpha1.MavenArtifact]{
 				MavenArtifactSecretsSyncReconciler(certs),
 				MavenArtifactVersionSyncReconciler(),
-				MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost, now),
+				MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost, now, maxArtifactSize),
 				MavenArtifactIntervalReconciler(),
 			},
 		},
@@ -219,6 +293,13 @@ func MavenArtifactVersionSyncReconciler() reconcilers.SubReconciler[*sourcev1alp
 						`Request timeout error downloading Maven artifact metadata "%v:%v" from repository URL %q: %v`, groupId, artifactId, repoSpecURL, err)
 					return nil
 				}
+				// handle size limit error
+				var sizeErr *sizeLimitError
+				if errors.As(err, &sizeErr) {
+					parent.ManageConditions().MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactResolved, "SizeLimitExceeded", "%s", err.Error())
+					return nil
+				}
+
 				// handle http error
 				dlerr, isDownloadError := err.(*downloadError)
 				if isDownloadError {
@@ -267,7 +348,7 @@ func MavenArtifactVersionSyncReconciler() reconcilers.SubReconciler[*sourcev1alp
 	}
 }
 
-func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func() metav1.Time) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
+func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func() metav1.Time, maxArtifactSize int64) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
 	return &reconcilers.SyncReconciler[*sourcev1alpha1.MavenArtifact]{
 		Name: "MavenArtifactDownloadSyncReconciler",
 		Finalize: func(ctx context.Context, parent *sourcev1alpha1.MavenArtifact) error {
@@ -302,6 +383,13 @@ func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func(
 				if errors.Is(err, context.DeadlineExceeded) {
 					parent.ManageConditions().MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactAvailable, "Timeout",
 						"Request timeout error downloading Maven artifact checksum file %q: %s", fmt.Sprintf("%s.%s", artifactInfo.ArtifactDownloadURL, "sha1"), err.Error())
+					return nil
+				}
+
+				// handle size limit error
+				var sizeErr *sizeLimitError
+				if errors.As(err, &sizeErr) {
+					parent.ManageConditions().MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactAvailable, "SizeLimitExceeded", "%s", err.Error())
 					return nil
 				}
 
@@ -366,13 +454,22 @@ func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func(
 			defer os.RemoveAll(dir)
 
 			// Download the artifact
-			artifactDir, err := downloadArtifact(ctx, artifactInfo.ArtifactDownloadURL, dir, artifactInfo.ResolvedFileName, remoteChecksum, client)
+			downloadBudget := newSizeBudget(maxArtifactSize, fmt.Sprintf("Maven artifact file %q", artifactInfo.ResolvedFileName), maxArtifactSizeRecourse)
+			artifactDir, err := downloadArtifact(ctx, artifactInfo.ArtifactDownloadURL, dir, artifactInfo.ResolvedFileName, remoteChecksum, client, downloadBudget)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					parent.ManageConditions().MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactAvailable, "Timeout",
 						"Request timeout error downloading Maven artifact file %q: %s", parent.Spec.Artifact.ArtifactId, err.Error())
 					return nil
 				}
+
+				// handle size limit error
+				var sizeErr *sizeLimitError
+				if errors.As(err, &sizeErr) {
+					parent.ManageConditions().MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactAvailable, "SizeLimitExceeded", "%s", err.Error())
+					return nil
+				}
+
 				// Handle http error
 				dlerr, isDownloadError := err.(*downloadError)
 				if isDownloadError {
@@ -415,8 +512,14 @@ func MavenArtifactDownloadSyncReconciler(httpRootDir, httpHost string, now func(
 			// Unpack if artifact is an archive
 			artifactFilePath := path.Join(artifactDir, artifactInfo.ResolvedFileName)
 			if isArchive(artifactFilePath) {
-				artifactDir, err = extractArchive(dir, artifactFilePath)
+				extractBudget := newSizeBudget(maxArtifactSize, fmt.Sprintf("Extracted contents of Maven artifact file %q", artifactInfo.ResolvedFileName), maxArtifactSizeRecourse)
+				artifactDir, err = extractArchive(dir, artifactFilePath, extractBudget)
 				if err != nil {
+					var sizeErr *sizeLimitError
+					if errors.As(err, &sizeErr) {
+						parent.ManageConditions().MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactAvailable, "SizeLimitExceeded", "%s", err.Error())
+						return nil
+					}
 					parent.ManageConditions().MarkFalse(sourcev1alpha1.MavenArtifactConditionArtifactAvailable, "FileError",
 						"Failed to extract Maven artifact file %q", artifactInfo.ResolvedFileName)
 					log.Error(err, "failed to extract", "file", artifactInfo.ResolvedFileName)
@@ -511,7 +614,8 @@ func buildRequestObject(ctx context.Context, requestType, url string, authOpts *
 
 func downloadMetadata(ctx context.Context, client *http.Client, url string) (*mavenmetadata.MavenMetadata, error) {
 	// download metadata
-	meta, err := download(ctx, url, client)
+	budget := newSizeBudget(maxMetadataSize, fmt.Sprintf("Maven artifact metadata at URL %q", url), "")
+	meta, err := download(ctx, url, client, budget)
 	if err != nil {
 		return nil, err
 	}
@@ -527,14 +631,16 @@ func downloadMetadata(ctx context.Context, client *http.Client, url string) (*ma
 
 func downloadChecksum(ctx context.Context, client *http.Client, url string) (string, error) {
 	// download checksum
-	checksum, err := download(ctx, fmt.Sprintf("%s.%s", url, "sha1"), client)
+	checksumURL := fmt.Sprintf("%s.%s", url, "sha1")
+	budget := newSizeBudget(maxChecksumSize, fmt.Sprintf("Maven artifact checksum at URL %q", checksumURL), "")
+	checksum, err := download(ctx, checksumURL, client, budget)
 	if err != nil {
 		return "", err
 	}
 	return string(checksum), nil
 }
 
-func downloadArtifact(ctx context.Context, url string, dir string, fileName string, checksum string, client *http.Client) (string, error) {
+func downloadArtifact(ctx context.Context, url string, dir string, fileName string, checksum string, client *http.Client, budget *sizeBudget) (string, error) {
 	artifactDir := path.Join(dir, "artifact")
 	err := os.Mkdir(artifactDir, os.ModePerm)
 	if err != nil {
@@ -565,8 +671,11 @@ func downloadArtifact(ctx context.Context, url string, dir string, fileName stri
 	}
 
 	// copy response body to file
-	_, err = io.Copy(out, response.Body)
-	if err != nil {
+	if _, err := io.Copy(budget.wrap(out), response.Body); err != nil {
+		var sizeErr *sizeLimitError
+		if errors.As(err, &sizeErr) {
+			return "", sizeErr
+		}
 		return "", fmt.Errorf("Error downloading Maven artifact file data %q: %q", out.Name(), err)
 	}
 
@@ -584,7 +693,7 @@ func downloadArtifact(ctx context.Context, url string, dir string, fileName stri
 	return artifactDir, nil
 }
 
-func download(ctx context.Context, url string, client *http.Client) ([]byte, error) {
+func download(ctx context.Context, url string, client *http.Client, budget *sizeBudget) ([]byte, error) {
 	// build httpRequest object
 	request, err := buildRequestObject(ctx, "GET", url, basicAuthCredentialsFromSecret(ctx))
 	if err != nil {
@@ -605,12 +714,16 @@ func download(ctx context.Context, url string, client *http.Client) ([]byte, err
 	}
 
 	// read response body
-	responseBody, err := io.ReadAll(response.Body)
-	if err != nil {
+	var buf bytes.Buffer
+	if _, err := io.Copy(budget.wrap(&buf), response.Body); err != nil {
+		var sizeErr *sizeLimitError
+		if errors.As(err, &sizeErr) {
+			return nil, sizeErr
+		}
 		return nil, &downloadError{err: fmt.Errorf("Error downloading file data from URL %q: %q", url, err), httpStatuscode: response.StatusCode}
 	}
 
-	return responseBody, nil
+	return buf.Bytes(), nil
 }
 
 func stashHttpClient(ctx context.Context, httpclient *http.Client) {
@@ -692,7 +805,7 @@ func copyCompressedFile(from, to string) error {
 	return nil
 }
 
-func extractArchive(parentDir string, pathToJarFile string) (string, error) {
+func extractArchive(parentDir string, pathToJarFile string, budget *sizeBudget) (string, error) {
 	openedFile, err := zip.OpenReader(pathToJarFile)
 	if err != nil {
 		return "", err
@@ -705,12 +818,19 @@ func extractArchive(parentDir string, pathToJarFile string) (string, error) {
 
 	defer openedFile.Close()
 
+	if len(openedFile.File) > maxArchiveEntries {
+		return "", &sizeLimitError{
+			what:  fmt.Sprintf("Number of entries in archive %q", path.Base(pathToJarFile)),
+			limit: maxArchiveEntries,
+		}
+	}
+
 	for _, file := range openedFile.File {
 		filePath, err := safeArchiveEntryPath(fileDestinationFolder, file.Name)
 		if err != nil {
 			return "", err
 		}
-		if err = extractFile(file, filePath); err != nil {
+		if err = extractFile(file, filePath, budget); err != nil {
 			return "", err
 		}
 	}
@@ -733,7 +853,7 @@ func safeArchiveEntryPath(destDir, name string) (string, error) {
 	return joined, nil
 }
 
-func extractFile(file *zip.File, filePath string) error {
+func extractFile(file *zip.File, filePath string, budget *sizeBudget) error {
 	if file.FileInfo().IsDir() {
 		if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
 			return err
@@ -750,7 +870,7 @@ func extractFile(file *zip.File, filePath string) error {
 			return err
 		}
 		defer destinationFile.Close()
-		if _, err := io.Copy(destinationFile, fileInArchive); err != nil {
+		if _, err := io.Copy(budget.wrap(destinationFile), fileInArchive); err != nil {
 			return err
 		}
 	}

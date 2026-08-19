@@ -17,6 +17,8 @@ limitations under the License.
 package controllers_test
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"crypto/subtle"
@@ -50,6 +52,23 @@ import (
 	"github.com/vmware-tanzu/tanzu-source-controller/controllers"
 	diesourcev1alpha1 "github.com/vmware-tanzu/tanzu-source-controller/dies/source/v1alpha1"
 )
+
+func buildSingleEntryZip(t *testing.T, entryName, contents string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	entry, err := w.Create(entryName)
+	if err != nil {
+		t.Fatalf("failed to create zip entry %q: %v", entryName, err)
+	}
+	if _, err := entry.Write([]byte(contents)); err != nil {
+		t.Fatalf("failed to write zip entry %q: %v", entryName, err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("failed to close zip writer: %v", err)
+	}
+	return buf.Bytes()
+}
 
 func TestMavenArtifactSecretsSyncReconciler(t *testing.T) {
 	namespace := "test-namespace"
@@ -393,6 +412,7 @@ func TestMavenArtifactVersionSyncReconciler(t *testing.T) {
 		groupId                           = "org.my-group"
 		artifactType                      = "jar"
 		missingArtifactId                 = "missing-artifact"
+		oversizedMetadataArtifactId       = "oversized-metadata-artifact"
 		pinnedVersion                     = "2.6.0"
 		latestVersion                     = "2.6.7"
 		releaseVersion                    = "2.6.7"
@@ -598,6 +618,8 @@ func TestMavenArtifactVersionSyncReconciler(t *testing.T) {
 				w.Write([]byte(latestArtifactWithSnapshotData))
 			} else if r.URL.Path == fmt.Sprintf("/ca-releases/org/my-group/%v/%v/maven-metadata.xml", latestArtifactId, latestSnapshotVersion) {
 				w.Write([]byte(latestArtifactWithSnapshotVersionData))
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/org/my-group/%v/maven-metadata.xml", oversizedMetadataArtifactId) {
+				w.Write(bytes.Repeat([]byte("a"), 8*1024*1024+1))
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -811,6 +833,20 @@ func TestMavenArtifactVersionSyncReconciler(t *testing.T) {
 			d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
 				d.GroupId(groupId)
 				d.ArtifactId(badArtifactId)
+				d.Type(artifactType)
+				d.Version("RELEASE")
+			})
+			d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+				d.URL(tlsServer.URL + "/ca-releases")
+				d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+			})
+		})
+
+	parentWithOversizedMetadataArtifact := parent.
+		SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+			d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+				d.GroupId(groupId)
+				d.ArtifactId(oversizedMetadataArtifactId)
 				d.Type(artifactType)
 				d.Version("RELEASE")
 			})
@@ -1044,6 +1080,25 @@ func TestMavenArtifactVersionSyncReconciler(t *testing.T) {
 				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
 			},
 		},
+		"metadata exceeds size limit": {
+			Resource: parentWithOversizedMetadataArtifact.DieReleasePtr(),
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			ExpectResource: parentWithOversizedMetadataArtifact.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionFalse).Reason("SizeLimitExceeded").
+							Messagef(`Maven artifact metadata at URL %q exceeds the maximum allowed size of 8Mi`, fmt.Sprintf("%s/ca-releases/org/my-group/%s/maven-metadata.xml", tlsServer.URL, oversizedMetadataArtifactId)),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("SizeLimitExceeded").
+							Messagef(`Maven artifact metadata at URL %q exceeds the maximum allowed size of 8Mi`, fmt.Sprintf("%s/ca-releases/org/my-group/%s/maven-metadata.xml", tlsServer.URL, oversizedMetadataArtifactId)),
+					)
+				}).DieReleasePtr(),
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+			},
+		},
 		"metadata protected by TLS": {
 			Resource: parentWithCaCertificate.DieReleasePtr(),
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
@@ -1212,10 +1267,18 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 	badArtifactId := "goodbyeworld"
 	failDownloadArtifact := "fail-download"
 	checksumMismatchArtifactId := "checksum-mismatch"
+	oversizedChecksumArtifactId := "oversized-checksum-artifact"
+	oversizedArtifactId := "oversized-artifact"
+	oversizedExtractedArtifactId := "oversized-extracted-artifact"
 	artifactVersion := "1.1"
 	classifier := "sources"
 	failDownloadZip := fmt.Sprintf("%s-%s.zip", failDownloadArtifact, artifactVersion)
 	checksumMismatchFilename := fmt.Sprintf("%s-%s.jar", checksumMismatchArtifactId, artifactVersion)
+	oversizedChecksumFilename := fmt.Sprintf("%s-%s.jar", oversizedChecksumArtifactId, artifactVersion)
+	oversizedFilename := fmt.Sprintf("%s-%s.jar", oversizedArtifactId, artifactVersion)
+	oversizedExtractedFilename := fmt.Sprintf("%s-%s.zip", oversizedExtractedArtifactId, artifactVersion)
+	oversizedArtifactBody := bytes.Repeat([]byte("a"), 4*1024)
+	oversizedExtractedZipBody := buildSingleEntryZip(t, "big.txt", strings.Repeat("a", 4*1024))
 	fileName := fmt.Sprintf("%s-%s.jar", artifactId, artifactVersion)
 	badFilename := fmt.Sprintf("%s-%s.jar", badArtifactId, artifactVersion)
 	fileNameWithZip := fmt.Sprintf("%s-%s.zip", artifactId, artifactVersion)
@@ -1321,6 +1384,23 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 				// checksum-mismatch error path (a plain error, not a *downloadError)
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"))
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v.sha1", groupId, oversizedChecksumArtifactId, artifactVersion, oversizedChecksumFilename) {
+				w.WriteHeader(http.StatusOK)
+				w.Write(bytes.Repeat([]byte("a"), 9*1024))
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, oversizedArtifactId, artifactVersion, oversizedFilename) {
+				w.WriteHeader(http.StatusOK)
+				w.Write(oversizedArtifactBody)
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v.sha1", groupId, oversizedArtifactId, artifactVersion, oversizedFilename) {
+				sum := sha1.Sum(oversizedArtifactBody)
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(fmt.Sprintf("%x", sum)))
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v", groupId, oversizedExtractedArtifactId, artifactVersion, oversizedExtractedFilename) {
+				w.WriteHeader(http.StatusOK)
+				w.Write(oversizedExtractedZipBody)
+			} else if r.URL.Path == fmt.Sprintf("/ca-releases/%v/%v/%v/%v.sha1", groupId, oversizedExtractedArtifactId, artifactVersion, oversizedExtractedFilename) {
+				sum := sha1.Sum(oversizedExtractedZipBody)
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(fmt.Sprintf("%x", sum)))
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -1427,6 +1507,32 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 			d.ConditionsDie(
 				diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
 			)
+		})
+
+	parentWithOversizedArtifact := parent.
+		SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+			d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+				d.Type("jar")
+				d.ArtifactId(oversizedArtifactId)
+				d.GroupId(groupId)
+			})
+			d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+				d.URL(tlsServer.URL + "/ca-releases")
+				d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+			})
+		})
+
+	parentWithOversizedExtractedArtifact := parent.
+		SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+			d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+				d.Type("zip")
+				d.ArtifactId(oversizedExtractedArtifactId)
+				d.GroupId(groupId)
+			})
+			d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+				d.URL(tlsServer.URL + "/ca-releases")
+				d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+			})
 		})
 
 	var (
@@ -1716,6 +1822,46 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 					)
 				}).DieReleasePtr(),
 		},
+		"checksum exceeds size limit": {
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     artifactVersion,
+					ResolvedFileName:    oversizedChecksumFilename,
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/my-group/%s/%s/%s", tlsServer.URL, oversizedChecksumArtifactId, artifactVersion, oversizedChecksumFilename),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			Resource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+						d.Type("jar")
+						d.ArtifactId(oversizedChecksumArtifactId)
+						d.GroupId(groupId)
+					})
+				}).DieReleasePtr(),
+			ExpectResource: parent.
+				SpecDie(func(d *diesourcev1alpha1.MavenArtifactSpecDie) {
+					d.RepositoryDie(func(d *diesourcev1alpha1.RepositoryDie) {
+						d.URL(tlsServer.URL + "/ca-releases")
+						d.SecretRef(corev1.LocalObjectReference{Name: "cert-secret-ref"})
+					})
+					d.MavenArtifactDie(func(d *diesourcev1alpha1.MavenArtifactTypeDie) {
+						d.Type("jar")
+						d.ArtifactId(oversizedChecksumArtifactId)
+						d.GroupId(groupId)
+					})
+				}).
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionFalse).Reason("SizeLimitExceeded").
+							Messagef(`Maven artifact checksum at URL %q exceeds the maximum allowed size of 8Ki`, fmt.Sprintf("%s/ca-releases/my-group/%s/%s/%s.sha1", tlsServer.URL, oversizedChecksumArtifactId, artifactVersion, oversizedChecksumFilename)),
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("SizeLimitExceeded").
+							Messagef(`Maven artifact checksum at URL %q exceeds the maximum allowed size of 8Ki`, fmt.Sprintf("%s/ca-releases/my-group/%s/%s/%s.sha1", tlsServer.URL, oversizedChecksumArtifactId, artifactVersion, oversizedChecksumFilename)),
+					)
+				}).DieReleasePtr(),
+		},
 		"downloaded artifact checksum does not match remote checksum": {
 			Differ: tempArtifactPathNormalizingDiffer{Differ: rtesting.DefaultDiffer},
 			GivenStashedValues: map[reconcilers.StashKey]interface{}{
@@ -1864,7 +2010,7 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 		}}
 
 	successRTS.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
-		return controllers.MavenArtifactDownloadSyncReconciler(artifactRootDir, "artifact.example", now)
+		return controllers.MavenArtifactDownloadSyncReconciler(artifactRootDir, "artifact.example", now, 0)
 	})
 
 	failRTS := rtesting.SubReconcilerTests[*sourcev1alpha1.MavenArtifact]{
@@ -1933,7 +2079,57 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 				}).DieReleasePtr(),
 		}}
 	failRTS.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
-		return controllers.MavenArtifactDownloadSyncReconciler(artifactRootDir, "artifact.example", now)
+		return controllers.MavenArtifactDownloadSyncReconciler(artifactRootDir, "artifact.example", now, 0)
+	})
+
+	sizeLimitRTS := rtesting.SubReconcilerTests[*sourcev1alpha1.MavenArtifact]{
+		"artifact exceeds size limit": {
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     artifactVersion,
+					ResolvedFileName:    oversizedFilename,
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/%s/%s/%s/%s", tlsServer.URL, groupId, oversizedArtifactId, artifactVersion, oversizedFilename),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			Resource: parentWithOversizedArtifact.DieReleasePtr(),
+			ExpectResource: parentWithOversizedArtifact.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionFalse).Reason("SizeLimitExceeded").
+							Messagef(`Maven artifact file %q exceeds the maximum allowed size of 1Ki; raise the limit with the --maven-artifact-max-size flag (Carvel data value maven_artifact_max_size), or set it to "0" to disable the limit`, oversizedFilename),
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("SizeLimitExceeded").
+							Messagef(`Maven artifact file %q exceeds the maximum allowed size of 1Ki; raise the limit with the --maven-artifact-max-size flag (Carvel data value maven_artifact_max_size), or set it to "0" to disable the limit`, oversizedFilename),
+					)
+				}).DieReleasePtr(),
+		},
+		"extracted contents exceed size limit": {
+			GivenStashedValues: map[reconcilers.StashKey]interface{}{
+				controllers.MavenArtifactVersionStashKey: controllers.ArtifactDetails{
+					ArtifactVersion:     artifactVersion,
+					ResolvedFileName:    oversizedExtractedFilename,
+					ArtifactDownloadURL: fmt.Sprintf("%s/ca-releases/%s/%s/%s/%s", tlsServer.URL, groupId, oversizedExtractedArtifactId, artifactVersion, oversizedExtractedFilename),
+				},
+				controllers.MavenArtifactAuthSecretStashKey: validAuthorisedSecret,
+				controllers.MavenArtifactHttpClientKey:      tlsServer.Client(),
+			},
+			Resource: parentWithOversizedExtractedArtifact.DieReleasePtr(),
+			ExpectResource: parentWithOversizedExtractedArtifact.
+				StatusDie(func(d *diesourcev1alpha1.MavenArtifactStatusDie) {
+					d.ConditionsDie(
+						diesourcev1alpha1.MavenArtifactConditionAvailableBlank.Status(metav1.ConditionFalse).Reason("SizeLimitExceeded").
+							Messagef(`Extracted contents of Maven artifact file %q exceeds the maximum allowed size of 1Ki; raise the limit with the --maven-artifact-max-size flag (Carvel data value maven_artifact_max_size), or set it to "0" to disable the limit`, oversizedExtractedFilename),
+						diesourcev1alpha1.MavenArtifactConditionVersionResolvedBlank.Status(metav1.ConditionTrue).Reason("Resolved"),
+						diesourcev1alpha1.MavenArtifactConditionReadyBlank.Status(metav1.ConditionFalse).Reason("SizeLimitExceeded").
+							Messagef(`Extracted contents of Maven artifact file %q exceeds the maximum allowed size of 1Ki; raise the limit with the --maven-artifact-max-size flag (Carvel data value maven_artifact_max_size), or set it to "0" to disable the limit`, oversizedExtractedFilename),
+					)
+				}).DieReleasePtr(),
+		},
+	}
+	sizeLimitRTS.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
+		return controllers.MavenArtifactDownloadSyncReconciler(artifactRootDir, "artifact.example", now, 1024)
 	})
 }
 
@@ -2352,7 +2548,7 @@ func TestMavenArtifactReconciler(t *testing.T) {
 		err := os.RemoveAll(artifactRootDir)
 		utilruntime.Must(err)
 
-		return controllers.MavenArtifactReconciler(c, artifactRootDir, "artifact.example", now, []controllers.Cert{})
+		return controllers.MavenArtifactReconciler(c, artifactRootDir, "artifact.example", now, []controllers.Cert{}, 0)
 	})
 }
 
@@ -2657,6 +2853,6 @@ func TestMavenArtifactJarDownloadAndValidation(t *testing.T) {
 	}
 
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*sourcev1alpha1.MavenArtifact], c reconcilers.Config) reconcilers.SubReconciler[*sourcev1alpha1.MavenArtifact] {
-		return controllers.MavenArtifactDownloadSyncReconciler(artifactRootDir, "artifact.example", now)
+		return controllers.MavenArtifactDownloadSyncReconciler(artifactRootDir, "artifact.example", now, 0)
 	})
 }

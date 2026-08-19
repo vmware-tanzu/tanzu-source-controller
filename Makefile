@@ -2,6 +2,7 @@
 # Suppress kapp prompts with KAPP_ARGS="--yes"
 KAPP_ARGS ?= "--yes=false"
 CA_DATA ?= dist/ca.pem
+MAVEN_ARTIFACT_MAX_SIZE ?=
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -74,9 +75,9 @@ uninstall: ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
 	@$(KAPP) delete -a source-controller -n kube-system $(KAPP_ARGS)
 
 .PHONY: deploy
-deploy: test ## Deploy controller to the K8s cluster specified in ~/.kube/config. Optional CA_DATA=path/to/certfile # a PEM-encoded CA certificate
+deploy: test ## Deploy controller to the K8s cluster specified in ~/.kube/config. Optional CA_DATA=path/to/certfile # a PEM-encoded CA certificate, MAVEN_ARTIFACT_MAX_SIZE=500Mi # cap on MavenArtifact download/extraction size
 	@echo "kapp deploy -a source-controller -n kube-system -f <(ko resolve -f dist/source-controller.yaml)"
-	@$(KAPP) deploy -a source-controller -n kube-system -f <($(KO) resolve -f <( $(YTT) -f dist/source-controller.yaml -f dist/package-overlay.yaml --data-value-file ca_cert_data=$(CA_DATA))) $(KAPP_ARGS)
+	@$(KAPP) deploy -a source-controller -n kube-system -f <($(KO) resolve -f <( $(YTT) -f dist/source-controller.yaml -f dist/package-overlay.yaml --data-value-file ca_cert_data=$(CA_DATA) --data-value maven_artifact_max_size=$(MAVEN_ARTIFACT_MAX_SIZE))) $(KAPP_ARGS)
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
