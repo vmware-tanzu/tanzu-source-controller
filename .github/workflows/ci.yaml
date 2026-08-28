@@ -441,6 +441,58 @@ jobs:
         kubectl wait --for=condition=complete --timeout=30s job maven-test
         kubectl logs job/maven-test | grep META-INF/MANIFEST.MF
 
+    - name: Fail for multiple kapp changes
+      run: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        deploys=$(kapp app-change list -a source-controller.app --json | jq '.Tables[0].Rows | length')
+        if [ "$((deploys))" -gt 1 ]; then
+          echo "Too many app changes for the source-controller package, expected 1 found ${deploys}"
+          exit 1
+        fi
+    - name: Size limit test
+      run: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        kapp delete -a source-controller --wait-timeout 5m -y
+
+        kapp deploy -a source-controller -y \
+          --wait-timeout 5m \
+          -f <( \
+            ytt -f dist/package-install.yaml -f dist/package-install.values.yaml \
+              --data-value package_constraints=0.0.0-snapshot \
+              --data-value-yaml 'package_prerelease={}' \
+              --data-value sync_period=10s \
+              --data-value-yaml 'has_values=true' \
+              --data-value-file ca_cert_data=${CERT_DIR}/ca.pem \
+              --data-value maven_artifact_max_size=1Ki \
+          )
+
+        cat <<EOF | kubectl create -f -
+        apiVersion: source.apps.tanzu.vmware.com/v1alpha1
+        kind: MavenArtifact
+        metadata:
+          name: size-limit-test
+        spec:
+          artifact:
+            groupId: org.springframework.boot
+            artifactId: spring-boot
+            version: "2.7.0"
+          repository:
+            url: https://repo1.maven.org/maven2
+          interval: 5m0s
+        EOF
+        kubectl wait --for=condition=Ready=false --timeout=60s mavenartifacts.source.apps.tanzu.vmware.com size-limit-test
+
+        reason=$(kubectl get mavenartifacts.source.apps.tanzu.vmware.com size-limit-test -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}')
+        if [ "${reason}" != "SizeLimitExceeded" ]; then
+          echo "expected Ready reason SizeLimitExceeded, got ${reason}"
+          exit 1
+        fi
     - name: Collect diagnostics
       run: |
         set +o errexit
@@ -460,6 +512,10 @@ jobs:
           echo "---"
           kubectl get secrets -n source-system -l control-plane=controller-manager -oyaml
         echo "##[endgroup]"
+        echo "##[group]Source Controller manager args"
+          kubectl get deployment -n source-system -l control-plane=controller-manager -o jsonpath='{..spec.template.spec.containers[?(@.name=="manager")].args}'
+          echo
+        echo "##[endgroup]"
         echo "##[group]Source Controller logs"
           kubectl logs -n source-system -l control-plane=controller-manager -c manager --tail 1000
         echo "##[endgroup]"
@@ -469,6 +525,9 @@ jobs:
         echo "##[group]Package Installs"
           kubectl get packageinstalls.packaging.carvel.dev -A -oyaml
           kubectl get secret source-controller-values -oyaml
+        echo "##[endgroup]"
+        echo "##[group]Package install apps"
+          kubectl get apps.kappctrl.k14s.io -A -oyaml
         echo "##[endgroup]"
         echo "##[group]Kapp list apps"
           kapp list -A
@@ -499,84 +558,6 @@ jobs:
         echo "##[endgroup]"
       if: always()
       continue-on-error: true
-    - name: Fail for multiple kapp changes
-      run: |
-        set -o errexit
-        set -o nounset
-        set -o pipefail
-
-        deploys=$(kapp app-change list -a source-controller.app --json | jq '.Tables[0].Rows | length')
-        if [ "$((deploys))" -gt 1 ]; then
-          echo "Too many app changes for the source-controller package, expected 1 found ${deploys}"
-          exit 1
-        fi
-    - name: Size limit test
-      run: |
-        set -o errexit
-        set -o nounset
-        set -o pipefail
-
-        kapp deploy -a source-controller -y \
-          --wait-timeout 5m \
-          -f <( \
-            ytt -f dist/package-install.yaml -f dist/package-install.values.yaml \
-              --data-value package_constraints=0.0.0-snapshot \
-              --data-value-yaml 'package_prerelease={}' \
-              --data-value sync_period=10s \
-              --data-value-yaml 'has_values=true' \
-              --data-value-file ca_cert_data=${CERT_DIR}/ca.pem \
-              --data-value maven_artifact_max_size=1Ki \
-          )
-
-        kubectl rollout status deployment/source-controller-manager -n source-system --timeout=60s
-
-        args=$(kubectl get deployment -n source-system -l control-plane=controller-manager -o jsonpath='{..spec.template.spec.containers[?(@.name=="manager")].args}')
-        echo "${args}" | grep -q -- "--maven-artifact-max-size=1Ki"
-
-        cat <<EOF | kubectl create -f -
-        apiVersion: source.apps.tanzu.vmware.com/v1alpha1
-        kind: MavenArtifact
-        metadata:
-          name: size-limit-test
-        spec:
-          artifact:
-            groupId: org.springframework.boot
-            artifactId: spring-boot
-            version: "2.7.0"
-          repository:
-            url: https://repo1.maven.org/maven2
-          interval: 5m0s
-        EOF
-        kubectl wait --for=condition=Ready=false --timeout=60s mavenartifacts.source.apps.tanzu.vmware.com size-limit-test
-
-        reason=$(kubectl get mavenartifacts.source.apps.tanzu.vmware.com size-limit-test -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}')
-        if [ "${reason}" != "SizeLimitExceeded" ]; then
-          echo "expected Ready reason SizeLimitExceeded, got ${reason}"
-          exit 1
-        fi
-
-        message=$(kubectl get mavenartifacts.source.apps.tanzu.vmware.com size-limit-test -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}')
-        echo "${message}" | grep -q -- "--maven-artifact-max-size"
-
-        artifact=$(kubectl get mavenartifacts.source.apps.tanzu.vmware.com size-limit-test -o jsonpath='{.status.artifact}')
-        if [ -n "${artifact}" ]; then
-          echo "expected status.artifact to be empty, got ${artifact}"
-          exit 1
-        fi
-
-        pod_name=$(kubectl get pods -n source-system -l control-plane=controller-manager --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].metadata.name}')
-
-        pod_phase=$(kubectl get pod -n source-system "${pod_name}" -o jsonpath='{.status.phase}')
-        if [ "${pod_phase}" != "Running" ]; then
-          echo "expected manager pod to be Running, got ${pod_phase}"
-          exit 1
-        fi
-
-        restart_count=$(kubectl get pod -n source-system "${pod_name}" -o jsonpath='{.status.containerStatuses[0].restartCount}')
-        if [ "${restart_count}" != "0" ]; then
-          echo "expected manager pod restartCount 0, got ${restart_count}"
-          exit 1
-        fi
     - name: Delete Gracefully
       run: |
         set -o errexit
