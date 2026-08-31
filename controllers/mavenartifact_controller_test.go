@@ -1285,8 +1285,8 @@ func TestMavenArtifactDownloadSyncReconciler(t *testing.T) {
 	fileNameAndClassifier := fmt.Sprintf("%s-%s-%s.jar", artifactId, artifactVersion, classifier)
 	artifactJarToTgzFilename := "8fdea0bf0e6441c8717853230a270e4ed51cd77a"
 	artifactZipToTgzFilename := "a3794eec54f0ab3a2d62c31cf5a3b947c1ecc2b1"
-	checksum := "6271d8d39c1936f8e0b25c8b2d43fe671f7de1f8"
-	zipChecksum := "d1f7d7c82fdb54a360e7f3c29024d3af2f10600c"
+	checksum := "be7b955c3c7fd83a04751be1361d3a741fd0e8be"
+	zipChecksum := "6694412ff647ae188b364976b3293ccec274f1ce"
 
 	now := func() metav1.Time {
 		return metav1.Time{
@@ -2143,7 +2143,7 @@ func TestMavenArtifactReconciler(t *testing.T) {
 	latestVersion := "1.1"
 	fileName := fmt.Sprintf("%s-%s.jar", artifactId, latestVersion)
 	fileNameWithoutType := "8fdea0bf0e6441c8717853230a270e4ed51cd77a"
-	checksum := "6271d8d39c1936f8e0b25c8b2d43fe671f7de1f8"
+	checksum := "be7b955c3c7fd83a04751be1361d3a741fd0e8be"
 
 	// TNZGOV-13098: artifact IDs used to prove the repository host cannot use an
 	// HTTP redirect to send the client's follow-up request to a different host.
@@ -2585,7 +2585,7 @@ func TestMavenArtifactJarDownloadAndValidation(t *testing.T) {
 	artifactVersion := "1.1"
 	fileName := fmt.Sprintf("%s-%s.jar", artifactId, artifactVersion)
 	artifactJarToTgzFilename := "8fdea0bf0e6441c8717853230a270e4ed51cd77a"
-	checksum := "6271d8d39c1936f8e0b25c8b2d43fe671f7de1f8"
+	checksum := "be7b955c3c7fd83a04751be1361d3a741fd0e8be"
 
 	now := func() metav1.Time {
 		return metav1.Time{
