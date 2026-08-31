@@ -17,7 +17,7 @@ The controller follows the spirit of the FluxCD Source Controller. An [`ImageRep
 
 ## Pre-requisites
 
-We require [Golang 1.20+](https://golang.org) to build the controller and deploy it. Internally, the `make` target will create a local version of [`ko`](https://github.com/google/ko) to build the controller, and [`kapp`](https://get-kapp.io) to deploy the controller to a cluster.
+We require [Golang 1.27+](https://golang.org) to build the controller and deploy it. Internally, the `make` target will create a local version of [`ko`](https://github.com/google/ko) to build the controller, and [`kapp`](https://get-kapp.io) to deploy the controller to a cluster.
 
 All 3 CLIs can be easily installed via brew:
 
@@ -154,6 +154,8 @@ Version support implemented in the following order:
 5. version ranges - <https://maven.apache.org/enforcer/enforcer-rules/versionRanges.html>
 
 **NOTE:** Pinned versions should be immutable, all other versions are dynamic and may change at any time. The `.spec.interval` defines how frequently to check for updated artifacts.
+
+A downloaded Maven artifact and, separately, its extracted contents are each capped at `500Mi` by default, since `MavenArtifact` resources are unpacked to local disk and no PersistentVolume backs the artifact working directory. Set the `--maven-artifact-max-size` flag (Carvel data value `maven_artifact_max_size`) to raise the limit, or to `0` to disable it. This limit applies only to `MavenArtifact`, not `ImageRepository`.
 
 ## Troubleshooting
 
