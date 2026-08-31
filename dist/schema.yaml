@@ -11,3 +11,7 @@
 #@schema/desc "Optional: Tanzu Source Controller resource limit configuration"
 #@schema/type any=True
   resources: {}
+
+#! Default kept in sync with main.go's --maven-artifact-max-size flag default.
+#@schema/desc "Maximum size of a MavenArtifact's downloaded file, and separately of its extracted contents; peak temporary disk usage can reach roughly twice this value. Applies only to MavenArtifact resources, not ImageRepository. Set to 0 to disable the limit."
+  maven_artifact_max_size: "500Mi"

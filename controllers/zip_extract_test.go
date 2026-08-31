@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"archive/zip"
+	"errors"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -58,7 +60,7 @@ func TestExtractArchiveRejectsZipSlip(t *testing.T) {
 			parentDir := t.TempDir()
 			zipPath := writeTestZip(t, parentDir, tc.entryName, "pwned")
 
-			if _, err := extractArchive(parentDir, zipPath); err == nil {
+			if _, err := extractArchive(parentDir, zipPath, newSizeBudget(0, "extracted contents", "")); err == nil {
 				t.Fatalf("expected extractArchive to reject entry %q, got nil error", tc.entryName)
 			}
 
@@ -82,7 +84,7 @@ func TestExtractArchiveWellBehavedEntries(t *testing.T) {
 		{name: "com/example/Foo.class", contents: "fake-class-bytes"},
 	})
 
-	extractedDir, err := extractArchive(parentDir, zipPath)
+	extractedDir, err := extractArchive(parentDir, zipPath, newSizeBudget(0, "extracted contents", ""))
 	if err != nil {
 		t.Fatalf("unexpected error extracting well-behaved archive: %v", err)
 	}
@@ -91,6 +93,86 @@ func TestExtractArchiveWellBehavedEntries(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(extractedDir, entry)); err != nil {
 			t.Fatalf("expected extracted file %q: %v", entry, err)
 		}
+	}
+}
+
+func TestExtractArchiveSingleEntryOverBudget(t *testing.T) {
+	parentDir := t.TempDir()
+	zipPath := writeTestZip(t, parentDir, "big.txt", strings.Repeat("a", 4*1024))
+
+	_, err := extractArchive(parentDir, zipPath, newSizeBudget(1024, "extracted contents", maxArtifactSizeRecourse))
+
+	var sizeErr *sizeLimitError
+	if !errors.As(err, &sizeErr) {
+		t.Fatalf("extractArchive() error = %v, want *sizeLimitError", err)
+	}
+}
+
+func TestExtractArchiveRunningTotalAcrossEntries(t *testing.T) {
+	parentDir := t.TempDir()
+	chunk := strings.Repeat("a", 400)
+	zipPath := writeTestZipMulti(t, parentDir, []zipEntry{
+		{name: "a.txt", contents: chunk},
+		{name: "b.txt", contents: chunk},
+		{name: "c.txt", contents: chunk},
+		{name: "d.txt", contents: chunk},
+	})
+
+	_, err := extractArchive(parentDir, zipPath, newSizeBudget(1000, "extracted contents", maxArtifactSizeRecourse))
+
+	var sizeErr *sizeLimitError
+	if !errors.As(err, &sizeErr) {
+		t.Fatalf("extractArchive() error = %v, want *sizeLimitError", err)
+	}
+}
+
+func TestExtractArchiveUnlimited(t *testing.T) {
+	parentDir := t.TempDir()
+	contents := strings.Repeat("a", 4*1024)
+	zipPath := writeTestZipMulti(t, parentDir, []zipEntry{
+		{name: "a.txt", contents: contents},
+		{name: "b.txt", contents: contents},
+	})
+
+	extractedDir, err := extractArchive(parentDir, zipPath, newSizeBudget(0, "extracted contents", ""))
+	if err != nil {
+		t.Fatalf("extractArchive() returned error: %v", err)
+	}
+
+	for _, name := range []string{"a.txt", "b.txt"} {
+		info, err := os.Stat(filepath.Join(extractedDir, name))
+		if err != nil {
+			t.Fatalf("os.Stat(%q) returned error: %v", name, err)
+		}
+		if info.Size() != 4096 {
+			t.Errorf("%s size = %d, want 4096", name, info.Size())
+		}
+	}
+}
+
+func TestExtractArchiveRejectsTooManyEntries(t *testing.T) {
+	parentDir := t.TempDir()
+	entries := make([]zipEntry, maxArchiveEntries+1)
+	for i := range entries {
+		entries[i] = zipEntry{name: fmt.Sprintf("file%d.txt", i)}
+	}
+	zipPath := writeTestZipMulti(t, parentDir, entries)
+
+	_, err := extractArchive(parentDir, zipPath, newSizeBudget(0, "extracted contents", ""))
+	if err == nil {
+		t.Fatal("expected extractArchive to reject an archive with too many entries, got nil error")
+	}
+	var sizeErr *sizeLimitError
+	if !errors.As(err, &sizeErr) {
+		t.Errorf("extractArchive() error = %v, want a *sizeLimitError", err)
+	}
+
+	extractedFiles, err := os.ReadDir(filepath.Join(parentDir, "extracted-artifact"))
+	if err != nil {
+		t.Fatalf("os.ReadDir() returned error: %v", err)
+	}
+	if len(extractedFiles) != 0 {
+		t.Errorf("extracted-artifact contains %d files, want 0", len(extractedFiles))
 	}
 }
 

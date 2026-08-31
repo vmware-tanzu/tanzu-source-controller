@@ -7,6 +7,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -48,6 +50,20 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+// validateMaxArtifactSize rejects negative quantities. Comparing with CmpInt64
+// rather than Value() matters at the extreme: resource.MustParse("10E").Value()
+// overflows int64 and returns 0, while CmpInt64(0) correctly reports it as
+// positive.
+func validateMaxArtifactSize(q resource.Quantity) error {
+	if q.CmpInt64(0) < 0 {
+		return fmt.Errorf("--maven-artifact-max-size must not be negative, got %q", q.String())
+	}
+	if q.CmpInt64(0) > 0 && q.Value() == 0 {
+		return fmt.Errorf("--maven-artifact-max-size is too large and overflows int64, got %q", q.String())
+	}
+	return nil
+}
+
 func main() {
 	ctx := ctrl.SetupSignalHandler()
 
@@ -67,6 +83,9 @@ func main() {
 	flag.StringVar(&artifactRootDir, "artifact-root-directory", "./artifact-root", "The directory to stash and serve artifacts from.")
 	flag.StringVar(&artifactHost, "artifact-host", "localhost:8082", "The host name to use when constructing artifact urls.")
 	flag.StringVar(&caCertPath, "ca-cert-path", "", "The path to addition CA certificates.")
+	// Default kept in sync with dist/schema.yaml's maven_artifact_max_size.
+	maxArtifactSize := resource.QuantityValue{Quantity: resource.MustParse("500Mi")}
+	flag.Var(&maxArtifactSize, "maven-artifact-max-size", "Maximum size of a MavenArtifact's downloaded file, and separately of its extracted contents; peak temporary disk usage can reach roughly twice this value. Applies only to MavenArtifact resources, not ImageRepository. Set to 0 to disable the limit.")
 	opts := zap.Options{
 		Development: false,
 		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
@@ -75,6 +94,11 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	if err := validateMaxArtifactSize(maxArtifactSize.Quantity); err != nil {
+		setupLog.Error(err, "invalid --maven-artifact-max-size")
+		os.Exit(1)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
@@ -122,6 +146,7 @@ func main() {
 		artifactHost,
 		metav1.Now,
 		certs,
+		maxArtifactSize.Value(),
 	).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MavenArtifact")
 		os.Exit(1)
