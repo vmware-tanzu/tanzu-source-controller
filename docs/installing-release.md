@@ -8,6 +8,8 @@
 
 ## Preparation
 
+Each release's controller binary is built with the Go version pinned in that release's `go.mod` (currently Go 1.27+); no local Go install is required to install a release bundle.
+
 ### Container Registry
 
 - Access to a [container registry](https://docs.docker.com/registry/introduction/) for fetching image metadata. It will not work for images that have bypassed a registry by loading directly into a local daemon.
@@ -51,6 +53,10 @@ If a `ImageRepository` resource references an image in a registry whose certific
 ```sh
 CA_DATA=path/to/certfile # a PEM-encoded CA certificate
 ```
+
+Optional: Adjust the MavenArtifact download size limit
+
+A downloaded Maven artifact and, separately, its extracted contents are each capped at `500Mi` by default, since `MavenArtifact` resources are unpacked to local disk and no PersistentVolume backs the artifact working directory. To raise the limit, or set it to `0` to disable it, append `--data-value maven_artifact_max_size=<size>` (e.g. `1Gi`) to the `ytt` invocation in the deploy command below.
 
 With the images relocated and the unpacked bundle as your current working directory, deploy Source Controller:
 
