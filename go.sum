@@ -1,5 +1,5 @@
-carvel.dev/imgpkg v0.48.1 h1:Ea6UufZKqSg9S6Bf1s83ye9GoLTnnAudIEDLSww3C7w=
-carvel.dev/imgpkg v0.48.1/go.mod h1:5+V0WDTaVOxnUosJ/6btoL7rXvmDCWYlBYV3BS9LBhg=
+carvel.dev/imgpkg v0.48.2 h1:smV/e4SinMXKcV1nAzNjSoulkBLtr0ACcGXHaG/emtk=
+carvel.dev/imgpkg v0.48.2/go.mod h1:tU8Z1Tr6zwOO5wUOzDoDfNRhCTbPS8vaBVFRz03Nw9M=
 cloud.google.com/go/compute/metadata v0.7.0 h1:PBWF+iiAerVNe8UCHxdOt6eHLVc3ydFeOCw78U8ytSU=
 cloud.google.com/go/compute/metadata v0.7.0/go.mod h1:j5MvL9PprKL39t166CoB1uVHfQMs4tFQZZcKwksXUjo=
 github.com/Azure/azure-sdk-for-go v68.0.0+incompatible h1:fcYLmCpyNYRnvJbPerq7U0hS+6+I79yEDJBqVNcqUzU=
