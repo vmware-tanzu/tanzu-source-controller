@@ -15,8 +15,12 @@ updates:
       patterns:
       - "k8s.io*"
   ignore:
+  # Tags >=0.100.0 declare the old github.com/vmware-tanzu/carvel-imgpkg module path.
   - dependency-name: "carvel.dev/imgpkg"
     versions: [">=0.100.0"]
+  # Untagged submodule: Dependabot selects parent tags that lack this package (#499).
+  # Update manually using a validated pseudo-version.
   - dependency-name: "github.com/google/go-containerregistry/pkg/authn/k8schain"
+  # Newer parent versions broke compatibility with imgpkg v0.49.1 (#510).
   - dependency-name: "github.com/google/go-containerregistry"
 
