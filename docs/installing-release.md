@@ -8,7 +8,7 @@
 
 ## Preparation
 
-Each release's controller binary is built with the Go version pinned in that release's `go.mod` (currently Go 1.27.3); no local Go install is required to install a release bundle.
+Each release's controller binary is built with the Go version pinned in that release's `go.mod` (currently Go 1.27+); no local Go install is required to install a release bundle.
 
 ### Container Registry
 
